@@ -9,10 +9,23 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;
-  line-height: 1.4;
+  line-height: 1.45;
   padding: 10px 12px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   background: var(--background-secondary);
   margin: 8px 0 12px 0;
+}
+
+.ticktick-flow-rule {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0 16px 0;
+  background: var(--background-primary-alt);
+}
+
+.ticktick-flow-rule h4,
+.ticktick-flow-rule h5 {
+  margin-top: 6px;
 }
