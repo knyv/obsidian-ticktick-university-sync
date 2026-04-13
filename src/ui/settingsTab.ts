@@ -539,20 +539,25 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Status sync mode')
-      .setDesc('Optionally map note status property to TickTick open/closed state')
+      .setDesc('Choose sync direction for status between Obsidian and TickTick')
       .addDropdown((d) =>
         d
           .addOption('off', 'Off (default)')
-          .addOption('obsidian_to_ticktick', 'Obsidian status -> TickTick open/closed')
+          .addOption('obsidian_to_ticktick', 'Obsidian -> TickTick')
+          .addOption('ticktick_to_obsidian', 'TickTick -> Obsidian')
+          .addOption('newest_wins', 'Newest wins (by modified time)')
           .setValue(rule.taskStatusSyncMode || 'off')
           .onChange(async (value) => {
-            rule.taskStatusSyncMode = value === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off';
+            rule.taskStatusSyncMode =
+              value === 'obsidian_to_ticktick' || value === 'ticktick_to_obsidian' || value === 'newest_wins'
+                ? value
+                : 'off';
             await this.plugin.saveSettings();
             this.display();
           }),
       );
 
-    if (rule.taskStatusSyncMode === 'obsidian_to_ticktick') {
+    if (rule.taskStatusSyncMode !== 'off') {
       new Setting(containerEl)
         .setName('Status property name')
         .setDesc('Frontmatter key to read status from (example: status, task_status)')

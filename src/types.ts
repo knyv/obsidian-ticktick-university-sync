@@ -5,7 +5,7 @@ export type TrackingMode = 'frontmatter' | 'local_json';
 // include_tags kept for legacy migration compatibility; UI now uses 'none' instead.
 export type TagSourceMode = 'all_note_tags' | 'none' | 'include_tags';
 export type TickTickTagAssignmentMode = 'merge' | 'rule_only';
-export type TaskStatusSyncMode = 'off' | 'obsidian_to_ticktick';
+export type TaskStatusSyncMode = 'off' | 'obsidian_to_ticktick' | 'ticktick_to_obsidian' | 'newest_wins';
 export type StatusPropertyType = 'text_or_list' | 'checkbox';
 export type CandidateSelectionMode = 'all' | 'new_only' | 'existing_only';
 export type DueWindowMode = 'all' | 'overdue_only' | 'not_overdue_only';
@@ -156,6 +156,8 @@ export type TickTickTaskSummary = {
   desc?: string;
   dueDate?: string;
   status?: number;
+  modifiedTime?: string;
+  completedTime?: string;
 };
 
 export type SyncCandidate = {

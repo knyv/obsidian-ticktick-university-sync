@@ -201,9 +201,11 @@ Status sync behavior:
   - `Create completed tasks when missing in TickTick` is ON by default.
   - If OFF, completed notes without an existing task link are skipped.
 
-- Rule setting `Status sync mode` controls mapping from note status property to TickTick open/closed:
-  - `Off` (default): keep legacy completion mapping
-  - `Obsidian status -> TickTick open/closed`: use your custom status mapping
+- Rule setting `Status sync mode` supports direction modes:
+  - `Off` (default)
+  - `Obsidian -> TickTick`
+  - `TickTick -> Obsidian`
+  - `Newest wins (by modified time)`
 - Status mapping options (per rule):
   - `Status property name` (frontmatter key, e.g. `status`, `task_status`, `state`)
   - `Status property type`: `Text/list values` or `Checkbox`
@@ -215,7 +217,8 @@ Status sync behavior:
 
 Source marker behavior:
 - Source marker text is appended to task content (not description).
-- Plugin also appends an internal sync marker in content for reliable relinking after manual task deletion/recreation.
+- Source marker is OFF by default.
+- Plugin always appends an internal sync marker in content for reliable relinking after manual task deletion/recreation.
 
 Guides/help blocks in settings:
 - Rule guide, preset guide, task content help, and template tokens are now visible in all modes.

@@ -66,7 +66,7 @@ export const DEFAULT_SETTINGS: TickTickUniversitySyncSettings = {
   preloadProjectsOnStartup: true,
   preloadProjectsDelayMs: 3500,
 
-  addSourceMarker: true,
+  addSourceMarker: false,
   sourceMarkerText: 'Created by TickTick Flow Sync',
 
   rules: [makeUniversityRule()],
@@ -166,7 +166,12 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       rule.dueWindowMode === 'overdue_only' || rule.dueWindowMode === 'not_overdue_only'
         ? rule.dueWindowMode
         : 'all',
-    taskStatusSyncMode: rule.taskStatusSyncMode === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off',
+    taskStatusSyncMode:
+      rule.taskStatusSyncMode === 'obsidian_to_ticktick' ||
+      rule.taskStatusSyncMode === 'ticktick_to_obsidian' ||
+      rule.taskStatusSyncMode === 'newest_wins'
+        ? rule.taskStatusSyncMode
+        : 'off',
     statusPropertyType: rule.statusPropertyType === 'checkbox' ? 'checkbox' : 'text_or_list',
     statusDoneValues: Array.isArray(rule.statusDoneValues)
       ? rule.statusDoneValues.map((x) => String(x).trim()).filter(Boolean)

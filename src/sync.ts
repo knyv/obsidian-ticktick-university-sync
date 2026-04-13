@@ -43,7 +43,7 @@ function resolveTaskStatusCode(candidate: SyncCandidate): 0 | 2 {
   const mode = candidate.rule.taskStatusSyncMode || 'off';
   const statusType = candidate.rule.statusPropertyType || 'text_or_list';
 
-  if (mode !== 'obsidian_to_ticktick') {
+  if (mode === 'off' || mode === 'ticktick_to_obsidian') {
     const done = candidate.rule.completedKeywords || ['completed', 'complete', 'done', 'finished'];
     return valueContainsAny(normalizeStatusValue(candidate.statusRaw), done) ? 2 : 0;
   }
@@ -344,6 +344,43 @@ async function updateFrontmatterTracking(
   });
 }
 
+function computeObsidianStatusFromRemote(
+  candidate: SyncCandidate,
+  remoteStatus: number | undefined,
+): { shouldUpdate: boolean; newValue: unknown } {
+  const statusType = candidate.rule.statusPropertyType || 'text_or_list';
+  const isDone = (remoteStatus ?? 0) === 2;
+
+  if (statusType === 'checkbox') {
+    const current = typeof candidate.statusRaw === 'boolean'
+      ? candidate.statusRaw
+      : ['true', '1', 'yes', 'checked'].includes(normalizeStatusValue(candidate.statusRaw));
+    return { shouldUpdate: current !== isDone, newValue: isDone };
+  }
+
+  const doneValues = (candidate.rule.statusDoneValues && candidate.rule.statusDoneValues.length)
+    ? candidate.rule.statusDoneValues
+    : ['completed', 'complete', 'done', 'finished'];
+  const openValues = (candidate.rule.statusOpenValues && candidate.rule.statusOpenValues.length)
+    ? candidate.rule.statusOpenValues
+    : ['todo', 'not-started', 'not started', 'in-progress', 'in progress'];
+
+  const current = normalizeStatusValue(candidate.statusRaw);
+  const target = isDone ? doneValues[0] || 'completed' : openValues[0] || 'todo';
+  return { shouldUpdate: current !== String(target).toLowerCase(), newValue: target };
+}
+
+async function syncRemoteStatusBackToObsidian(app: App, candidate: SyncCandidate, remoteStatus: number | undefined): Promise<boolean> {
+  const { shouldUpdate, newValue } = computeObsidianStatusFromRemote(candidate, remoteStatus);
+  if (!shouldUpdate) return false;
+
+  await app.fileManager.processFrontMatter(candidate.file, (fm) => {
+    (fm as Record<string, unknown>)[candidate.rule.statusField] = newValue;
+    (fm as Record<string, unknown>)[candidate.rule.syncedAtField] = new Date().toISOString();
+  });
+  return true;
+}
+
 async function ensureRuleProject(
   client: TickTickClient,
   rule: SyncRule,
@@ -519,6 +556,26 @@ export async function runSync(
           // Last fallback for APIs/clients that ignore status=0 in update payload.
           phase = 'reopen-task';
           await client.reopenTask(currentProjectId, currentTaskId).catch(() => undefined);
+        }
+      }
+
+      // Optional reverse sync: use TickTick status as source of truth back into Obsidian.
+      if (currentTaskId && (candidate.rule.taskStatusSyncMode === 'ticktick_to_obsidian' || candidate.rule.taskStatusSyncMode === 'newest_wins')) {
+        phase = 'read-remote-status';
+        const remote = await client.getTask(currentProjectId, currentTaskId).catch(() => undefined);
+        if (remote) {
+          const remoteMs = remote.modifiedTime ? Date.parse(remote.modifiedTime) : 0;
+          const localMs = Date.parse(String(candidate.frontmatter[candidate.rule.syncedAtField] || '')) || 0;
+
+          const applyRemote =
+            candidate.rule.taskStatusSyncMode === 'ticktick_to_obsidian'
+              ? true
+              : remoteMs > localMs;
+
+          if (applyRemote) {
+            phase = 'write-obsidian-status';
+            await syncRemoteStatusBackToObsidian(app, candidate, remote.status);
+          }
         }
       }
 
