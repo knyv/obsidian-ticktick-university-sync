@@ -6,6 +6,7 @@ export type TrackingMode = 'frontmatter' | 'local_json';
 export type TagSourceMode = 'all_note_tags' | 'none' | 'include_tags';
 export type TickTickTagAssignmentMode = 'merge' | 'rule_only';
 export type TaskStatusSyncMode = 'off' | 'obsidian_to_ticktick';
+export type StatusPropertyType = 'text_or_list' | 'checkbox';
 export type CandidateSelectionMode = 'all' | 'new_only' | 'existing_only';
 export type DueWindowMode = 'all' | 'overdue_only' | 'not_overdue_only';
 
@@ -26,6 +27,9 @@ export interface CustomRulePreset {
   candidateSelectionMode?: CandidateSelectionMode;
   dueWindowMode?: DueWindowMode;
   taskStatusSyncMode?: TaskStatusSyncMode;
+  statusPropertyType?: StatusPropertyType;
+  statusDoneValues?: string[];
+  statusOpenValues?: string[];
   completedKeywords?: string[];
   titleTemplate?: string;
   contentTemplate?: string;
@@ -65,6 +69,9 @@ export interface SyncRule {
   markCompletedInTickTick: boolean;
   syncMode: SyncMode;
   taskStatusSyncMode?: TaskStatusSyncMode;
+  statusPropertyType?: StatusPropertyType;
+  statusDoneValues?: string[];
+  statusOpenValues?: string[];
   requireDueDate?: boolean;
   candidateSelectionMode?: CandidateSelectionMode;
   dueWindowMode?: DueWindowMode;
@@ -138,6 +145,16 @@ export type TickTickTaskPayload = {
   startDate?: string;
   dueDate?: string;
   timeZone?: string;
+  status?: number;
+};
+
+export type TickTickTaskSummary = {
+  id: string;
+  projectId?: string;
+  title?: string;
+  content?: string;
+  desc?: string;
+  dueDate?: string;
   status?: number;
 };
 

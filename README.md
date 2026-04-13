@@ -191,11 +191,19 @@ Tracking/update behavior:
 - Local JSON mode prefers local tracking entry, then falls back to frontmatter task ID if present.
 - Local tracking now stores both legacy key (`file.path`) and rule-scoped key (`rule.id::file.path`) to avoid collisions when multiple rules target same note.
 - Local tracking mirror is maintained in both modes to reduce accidental duplicates during mode switches/migrations.
+- If tracking IDs are missing/stale, sync now attempts heuristic relink in target project (title + due-date match) before creating new tasks.
+- Added command: `Tracking: link note to existing TickTick task` for explicit manual repair.
 
 Status sync behavior:
 - Rule setting `Status sync mode` controls mapping from note status property to TickTick open/closed:
   - `Off` (default): preserve existing completion logic only
-  - `Obsidian status -> TickTick open/closed`: interpret note status text and map completed keywords to closed
+  - `Obsidian status -> TickTick open/closed`: use configurable status mapping
+- Status mapping options (per rule):
+  - `Status property type`:
+    - `Text/list values` (default)
+    - `Checkbox (true/false)`
+  - `Status values treated as completed` (for text/list)
+  - `Status values treated as open` (for text/list)
 
 ## Commands
 
@@ -207,3 +215,4 @@ Command palette now focuses on operational commands (OAuth beginner actions are 
 - Projects: load TickTick project list
 - Projects: validate and refresh selected target projects
 - Tags: fetch known TickTick tags (preview)
+- Tracking: link note to existing TickTick task

@@ -224,6 +224,13 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       candidateSelectionMode: preset.candidateSelectionMode ?? 'all',
       dueWindowMode: preset.dueWindowMode ?? 'all',
       taskStatusSyncMode: preset.taskStatusSyncMode === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off',
+      statusPropertyType: preset.statusPropertyType === 'checkbox' ? 'checkbox' : 'text_or_list',
+      statusDoneValues: Array.isArray(preset.statusDoneValues) && preset.statusDoneValues.length
+        ? [...preset.statusDoneValues]
+        : ['completed', 'complete', 'done', 'finished'],
+      statusOpenValues: Array.isArray(preset.statusOpenValues) && preset.statusOpenValues.length
+        ? [...preset.statusOpenValues]
+        : ['todo', 'not-started', 'not started', 'in-progress', 'in progress'],
       completedKeywords: Array.isArray(preset.completedKeywords) && preset.completedKeywords.length
         ? [...preset.completedKeywords]
         : ['completed', 'complete', 'done', 'finished'],
@@ -541,8 +548,52 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             rule.taskStatusSyncMode = value === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off';
             await this.plugin.saveSettings();
+            this.display();
           }),
       );
+
+    if (rule.taskStatusSyncMode === 'obsidian_to_ticktick') {
+      new Setting(containerEl)
+        .setName('Status property type')
+        .setDesc('How to interpret the status field in frontmatter')
+        .addDropdown((d) =>
+          d
+            .addOption('text_or_list', 'Text/list values')
+            .addOption('checkbox', 'Checkbox (true/false)')
+            .setValue(rule.statusPropertyType || 'text_or_list')
+            .onChange(async (value) => {
+              rule.statusPropertyType = value === 'checkbox' ? 'checkbox' : 'text_or_list';
+              await this.plugin.saveSettings();
+              this.display();
+            }),
+        );
+
+      if ((rule.statusPropertyType || 'text_or_list') === 'text_or_list') {
+        new Setting(containerEl)
+          .setName('Status values treated as completed')
+          .setDesc('Comma-separated values, e.g. completed, done')
+          .addText((text) =>
+            text
+              .setValue(listToCsv(rule.statusDoneValues || ['completed', 'complete', 'done', 'finished']))
+              .onChange(async (value) => {
+                rule.statusDoneValues = csvToList(value);
+                await this.plugin.saveSettings();
+              }),
+          );
+
+        new Setting(containerEl)
+          .setName('Status values treated as open')
+          .setDesc('Comma-separated values, e.g. todo, not-started, in-progress')
+          .addText((text) =>
+            text
+              .setValue(listToCsv(rule.statusOpenValues || ['todo', 'not-started', 'not started', 'in-progress', 'in progress']))
+              .onChange(async (value) => {
+                rule.statusOpenValues = csvToList(value);
+                await this.plugin.saveSettings();
+              }),
+          );
+      }
+    }
 
     containerEl.createEl('h5', { text: 'D) TickTick task content' });
     const showFormatting = !this.formattingEditorOpenByRuleId.has(rule.id);

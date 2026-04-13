@@ -21,6 +21,9 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     markCompletedInTickTick: true,
     syncMode: 'upsert',
     taskStatusSyncMode: 'off',
+    statusPropertyType: 'text_or_list',
+    statusDoneValues: ['completed', 'complete', 'done', 'finished'],
+    statusOpenValues: ['todo', 'not-started', 'not started', 'in-progress', 'in progress'],
     requireDueDate: true,
     candidateSelectionMode: 'all',
     dueWindowMode: 'all',
@@ -164,6 +167,13 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
         ? rule.dueWindowMode
         : 'all',
     taskStatusSyncMode: rule.taskStatusSyncMode === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off',
+    statusPropertyType: rule.statusPropertyType === 'checkbox' ? 'checkbox' : 'text_or_list',
+    statusDoneValues: Array.isArray(rule.statusDoneValues)
+      ? rule.statusDoneValues.map((x) => String(x).trim()).filter(Boolean)
+      : ['completed', 'complete', 'done', 'finished'],
+    statusOpenValues: Array.isArray(rule.statusOpenValues)
+      ? rule.statusOpenValues.map((x) => String(x).trim()).filter(Boolean)
+      : ['todo', 'not-started', 'not started', 'in-progress', 'in progress'],
     ticktickTagsField: typeof rule.ticktickTagsField === 'string' && rule.ticktickTagsField.trim()
       ? rule.ticktickTagsField
       : 'ticktick_tags',

@@ -1,4 +1,4 @@
-import { Notice, Plugin } from 'obsidian';
+import { FuzzySuggestModal, Notice, Plugin } from 'obsidian';
 import { DEFAULT_SCOPES, TICKTICK_DEVELOPER_APPS_URL } from './constants';
 import { BUILTIN_PRESETS, DEFAULT_SETTINGS, migrateSettings } from './defaults';
 import { exchangeCodeForToken, buildOAuthAuthorizeUrl, refreshToken } from './oauth';
@@ -8,6 +8,35 @@ import { TickTickClient } from './ticktickClient';
 import { TickTickUniversitySyncSettings } from './types';
 import { getTrackingForCandidate, setTrackingForCandidate } from './tracking';
 import { TickTickSyncSettingTab } from './ui/settingsTab';
+
+class TaskPickerModal extends FuzzySuggestModal<{ id: string; title?: string; dueDate?: string }> {
+  private items: { id: string; title?: string; dueDate?: string }[];
+  private onChoose: (item: { id: string; title?: string; dueDate?: string }) => Promise<void>;
+
+  constructor(
+    app: Plugin['app'],
+    items: { id: string; title?: string; dueDate?: string }[],
+    onChoose: (item: { id: string; title?: string; dueDate?: string }) => Promise<void>,
+  ) {
+    super(app);
+    this.items = items;
+    this.onChoose = onChoose;
+    this.setPlaceholder('Pick TickTick task to link with current note');
+  }
+
+  getItems() {
+    return this.items;
+  }
+
+  getItemText(item: { id: string; title?: string; dueDate?: string }) {
+    const due = item.dueDate ? ` | due ${String(item.dueDate).slice(0, 10)}` : '';
+    return `${item.title || '(untitled)'}${due}`;
+  }
+
+  async onChooseItem(item: { id: string; title?: string; dueDate?: string }): Promise<void> {
+    await this.onChoose(item);
+  }
+}
 
 export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   settings: TickTickUniversitySyncSettings = DEFAULT_SETTINGS;
@@ -82,6 +111,14 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
           return;
         }
         new Notice(`Known TickTick tags: ${tags.slice(0, 10).join(', ')}${tags.length > 10 ? '…' : ''}`);
+      },
+    });
+
+    this.addCommand({
+      id: 'ticktick-flow-link-existing-task',
+      name: 'Tracking: link note to existing TickTick task',
+      callback: async () => {
+        await this.linkCurrentNoteToExistingTask();
       },
     });
 
@@ -325,6 +362,66 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     new Notice(`TickTick connected. Projects: ${projects.length}`);
   }
 
+  async linkCurrentNoteToExistingTask() {
+    const file = this.app.workspace.getActiveFile();
+    if (!file) {
+      new Notice('Open a note first.');
+      return;
+    }
+
+    const cache = this.app.metadataCache.getFileCache(file);
+    const fm = (cache?.frontmatter || {}) as Record<string, unknown>;
+    const tags = (Array.isArray(fm.tags) ? fm.tags.map((x) => String(x)) : typeof fm.tags === 'string' ? String(fm.tags).split(',') : [])
+      .map((x) => x.trim().replace(/^#/, '').toLowerCase())
+      .filter(Boolean);
+
+    const rule = this.settings.rules.find((r) =>
+      r.enabled && r.tagsAny.some((t) => tags.includes(String(t).trim().replace(/^#/, '').toLowerCase())),
+    ) || this.settings.rules.find((r) => r.enabled);
+
+    if (!rule) {
+      new Notice('No enabled rule found for this note.');
+      return;
+    }
+
+    const projects = await this.listProjects();
+    const pid = rule.targetProjectId || projects.find((p) => p.name.toLowerCase() === rule.targetProjectName.toLowerCase())?.id;
+    if (!pid) {
+      new Notice('Rule has no valid target project. Select one first.');
+      return;
+    }
+
+    const tasks = await this.client.listProjectTasks(pid);
+    const modal = new TaskPickerModal(this.app, tasks, async (picked) => {
+      if (!picked?.id) return;
+      await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        (frontmatter as Record<string, unknown>)[rule.taskIdField] = picked.id;
+        (frontmatter as Record<string, unknown>)[rule.projectIdField] = pid;
+        (frontmatter as Record<string, unknown>)[rule.syncedAtField] = new Date().toISOString();
+      });
+
+      await setTrackingForCandidate(
+        this.app,
+        this.settings,
+        {
+          file,
+          frontmatter: fm,
+          rule,
+          dueRaw: '',
+          tags,
+          classNames: [],
+          statusRaw: fm[rule.statusField],
+          taskId: picked.id,
+          projectId: pid,
+        },
+        { taskId: picked.id, projectId: pid, syncedAt: new Date().toISOString() },
+        { forceLocal: true },
+      );
+      new Notice(`Linked to TickTick task: ${picked.title || picked.id}`);
+    });
+    modal.open();
+  }
+
   getBuiltInPresets() {
     return BUILTIN_PRESETS;
   }
@@ -348,6 +445,9 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       candidateSelectionMode: rule.candidateSelectionMode,
       dueWindowMode: rule.dueWindowMode,
       taskStatusSyncMode: rule.taskStatusSyncMode,
+      statusPropertyType: rule.statusPropertyType,
+      statusDoneValues: [...(rule.statusDoneValues || [])],
+      statusOpenValues: [...(rule.statusOpenValues || [])],
       completedKeywords: [...rule.completedKeywords],
       titleTemplate: rule.titleTemplate,
       contentTemplate: rule.contentTemplate,

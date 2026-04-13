@@ -9,6 +9,7 @@ import {
   TickTickUniversitySyncSettings,
   TrackingEntry,
   TrackingMode,
+  TickTickTaskSummary,
 } from './types';
 import { firstNonEmptyField, normalizeTag, prettyDue, renderTemplate, toStringArray } from './utils';
 
@@ -22,18 +23,49 @@ type ExistingTaskRef = {
   projectId?: string;
 };
 
-function isCompletedStatus(statusRaw: unknown, keywords: string[]): boolean {
-  const arr = toStringArray(statusRaw).map((s) => s.toLowerCase());
-  const scalar = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : '';
-  const joined = [...arr, scalar].join(' ');
-  return keywords.some((k) => joined.includes(k.toLowerCase()));
+function valueContainsAny(valueText: string, terms: string[]): boolean {
+  const low = valueText.toLowerCase();
+  return terms.some((t) => {
+    const term = String(t || '').trim().toLowerCase();
+    return term ? low.includes(term) : false;
+  });
 }
 
-function isOpenStatus(statusRaw: unknown): boolean {
-  const joined = [...toStringArray(statusRaw), typeof statusRaw === 'string' ? statusRaw : '']
-    .map((s) => String(s).toLowerCase())
-    .join(' ');
-  return ['in progress', 'in-progress', 'ongoing', 'started', 'todo', 'to do', 'not started', 'open'].some((k) => joined.includes(k));
+function normalizeStatusValue(statusRaw: unknown): string {
+  if (typeof statusRaw === 'boolean') return statusRaw ? 'true' : 'false';
+  const arr = toStringArray(statusRaw);
+  if (arr.length) return arr.join(' ').toLowerCase();
+  if (statusRaw === null || statusRaw === undefined) return '';
+  return String(statusRaw).toLowerCase();
+}
+
+function resolveTaskStatusCode(candidate: SyncCandidate): 0 | 2 {
+  const mode = candidate.rule.taskStatusSyncMode || 'off';
+  const statusType = candidate.rule.statusPropertyType || 'text_or_list';
+
+  if (mode !== 'obsidian_to_ticktick') {
+    const done = candidate.rule.completedKeywords || ['completed', 'complete', 'done', 'finished'];
+    return valueContainsAny(normalizeStatusValue(candidate.statusRaw), done) ? 2 : 0;
+  }
+
+  if (statusType === 'checkbox') {
+    if (typeof candidate.statusRaw === 'boolean') return candidate.statusRaw ? 2 : 0;
+    const low = normalizeStatusValue(candidate.statusRaw);
+    if (['true', '1', 'yes', 'checked'].some((x) => low === x)) return 2;
+    return 0;
+  }
+
+  const doneValues = (candidate.rule.statusDoneValues && candidate.rule.statusDoneValues.length)
+    ? candidate.rule.statusDoneValues
+    : ['completed', 'complete', 'done', 'finished'];
+  const openValues = (candidate.rule.statusOpenValues && candidate.rule.statusOpenValues.length)
+    ? candidate.rule.statusOpenValues
+    : ['todo', 'not-started', 'not started', 'in-progress', 'in progress'];
+
+  const low = normalizeStatusValue(candidate.statusRaw);
+  if (valueContainsAny(low, doneValues)) return 2;
+  if (valueContainsAny(low, openValues)) return 0;
+  return 0;
 }
 
 function getObsidianDeepLink(app: App, file: TFile): string {
@@ -167,6 +199,44 @@ function pickExistingTaskRef(
   return undefined;
 }
 
+function dueDatePrefix(dueRaw: string): string {
+  return parseDueToTickTick(dueRaw)?.dueDate?.slice(0, 10) || '';
+}
+
+function sameTaskByContent(candidate: SyncCandidate, remote: TickTickTaskSummary): boolean {
+  const localTitle = candidate.file.basename.trim().toLowerCase();
+  const remoteTitle = String(remote.title || '').trim().toLowerCase();
+  if (!localTitle || !remoteTitle || localTitle !== remoteTitle) return false;
+
+  const localDatePrefix = dueDatePrefix(candidate.dueRaw);
+  const remoteDatePrefix = String(remote.dueDate || '').slice(0, 10);
+  if (localDatePrefix && remoteDatePrefix && localDatePrefix !== remoteDatePrefix) return false;
+
+  return true;
+}
+
+function findExistingTaskByHeuristic(candidate: SyncCandidate, tasks: TickTickTaskSummary[]): ExistingTaskRef | undefined {
+  if (!tasks.length) return undefined;
+
+  const title = candidate.file.basename.trim().toLowerCase();
+  if (!title) return undefined;
+
+  const datePrefix = dueDatePrefix(candidate.dueRaw);
+  const titleMatches = tasks.filter((t) => String(t.title || '').trim().toLowerCase() === title);
+  if (!titleMatches.length) return undefined;
+
+  if (datePrefix) {
+    const byDue = titleMatches.find((t) => String(t.dueDate || '').slice(0, 10) === datePrefix);
+    if (byDue?.id) return { taskId: byDue.id, projectId: byDue.projectId };
+  }
+
+  if (titleMatches.length === 1 && titleMatches[0].id) {
+    return { taskId: titleMatches[0].id, projectId: titleMatches[0].projectId };
+  }
+
+  return undefined;
+}
+
 function buildTaskPayload(
   app: App,
   candidate: SyncCandidate,
@@ -227,10 +297,7 @@ function buildTaskPayload(
   const sourceMarker = settings.addSourceMarker ? settings.sourceMarkerText.trim() : '';
   const mergedDesc = [desc, sourceMarker].filter(Boolean).join('\n\n');
 
-  const completed = isCompletedStatus(candidate.statusRaw, candidate.rule.completedKeywords);
-  const statusCode = candidate.rule.taskStatusSyncMode === 'obsidian_to_ticktick'
-    ? (completed ? 2 : (isOpenStatus(candidate.statusRaw) ? 0 : 0))
-    : (completed ? 2 : 0);
+  const statusCode = resolveTaskStatusCode(candidate);
 
   return {
     id: existingId,
@@ -316,7 +383,8 @@ export async function runSync(
 
   for (const candidate of candidates) {
     try {
-      const completed = isCompletedStatus(candidate.statusRaw, candidate.rule.completedKeywords);
+      const statusCode = resolveTaskStatusCode(candidate);
+      const completed = statusCode === 2;
       const project = await ensureRuleProject(client, candidate.rule);
 
       const tracked = await tracking.read(candidate);
@@ -340,13 +408,39 @@ export async function runSync(
         continue;
       }
 
+      let verifiedTaskId = effectiveTaskId;
+      let verifiedProjectId = effectiveProjectId;
+      if (effectiveTaskId && effectiveProjectId) {
+        try {
+          const remote = await client.getTask(effectiveProjectId, effectiveTaskId);
+          if (!sameTaskByContent(candidate, remote)) {
+            verifiedTaskId = undefined;
+          }
+        } catch {
+          verifiedTaskId = undefined;
+        }
+      }
+
+      if (!verifiedTaskId) {
+        try {
+          const tasks = await client.listProjectTasks(project.id);
+          const found = findExistingTaskByHeuristic(candidate, tasks);
+          if (found?.taskId) {
+            verifiedTaskId = found.taskId;
+            verifiedProjectId = found.projectId || project.id;
+          }
+        } catch {
+          // heuristic lookup is best-effort only
+        }
+      }
+
       const payload = buildTaskPayload(
         app,
         candidate,
         settings,
-        effectiveProjectId,
+        verifiedProjectId,
         candidate.rule.targetProjectName || project.name,
-        effectiveTaskId,
+        verifiedTaskId,
       );
 
       if (settings.dryRun) {
@@ -354,17 +448,17 @@ export async function runSync(
         continue;
       }
 
-      let currentTaskId = effectiveTaskId;
-      let currentProjectId = effectiveProjectId;
+      let currentTaskId = verifiedTaskId;
+      let currentProjectId = verifiedProjectId;
 
       if (!currentTaskId) {
         const created = await client.createTask(payload);
         currentTaskId = created.id;
-        currentProjectId = created.projectId || effectiveProjectId;
+        currentProjectId = created.projectId || verifiedProjectId;
         summary.created += 1;
       } else if (candidate.rule.syncMode === 'upsert') {
         const updated = await client.updateTask(currentTaskId, payload);
-        currentProjectId = updated.projectId || effectiveProjectId;
+        currentProjectId = updated.projectId || verifiedProjectId;
         summary.updated += 1;
       }
 

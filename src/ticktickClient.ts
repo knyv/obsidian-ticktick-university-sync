@@ -1,6 +1,6 @@
 import { requestUrl } from 'obsidian';
 import { TICKTICK_API_BASE } from './constants';
-import { TickTickProject, TickTickTaskPayload } from './types';
+import { TickTickProject, TickTickTaskPayload, TickTickTaskSummary } from './types';
 
 export class TickTickClient {
   private getAccessToken: () => Promise<string>;
@@ -58,6 +58,21 @@ export class TickTickClient {
       id: taskId,
     };
     return this.request<{ id: string; projectId: string }>(`/open/v1/task/${encodeURIComponent(taskId)}`, 'POST', body);
+  }
+
+  async getTask(projectId: string, taskId: string): Promise<TickTickTaskSummary> {
+    return this.request<TickTickTaskSummary>(
+      `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}`,
+      'GET',
+    );
+  }
+
+  async listProjectTasks(projectId: string): Promise<TickTickTaskSummary[]> {
+    const data = await this.request<{ tasks?: TickTickTaskSummary[] }>(
+      `/open/v1/project/${encodeURIComponent(projectId)}/data`,
+      'GET',
+    );
+    return Array.isArray(data?.tasks) ? data.tasks : [];
   }
 
   async completeTask(projectId: string, taskId: string): Promise<void> {
