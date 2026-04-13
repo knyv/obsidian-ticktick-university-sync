@@ -82,6 +82,7 @@ export async function collectCandidates(app: App, settings: TickTickUniversitySy
 function buildTaskPayload(
   app: App,
   candidate: SyncCandidate,
+  settings: TickTickUniversitySyncSettings,
   projectId: string,
   projectName: string,
   existingId?: string,
@@ -92,7 +93,7 @@ function buildTaskPayload(
   const statusText = toStringArray(candidate.statusRaw).join(', ') || String(candidate.statusRaw ?? '').trim();
   const tagsText = candidate.tags.join(', ');
 
-  const tokens = {
+  const tokens: Record<string, string> = {
     noteTitle: candidate.file.basename,
     filePath: candidate.file.path,
     class: classText,
@@ -104,6 +105,20 @@ function buildTaskPayload(
     tags: tagsText || '(none)',
     projectName: projectName || '(not set)',
   };
+
+  if (settings.allowAllPropertyTokens) {
+    for (const [key, value] of Object.entries(candidate.frontmatter)) {
+      if (tokens[key] !== undefined) continue;
+      if (value === null || value === undefined) continue;
+      if (Array.isArray(value)) {
+        tokens[key] = value.map((x) => String(x)).join(', ');
+      } else if (typeof value === 'object') {
+        tokens[key] = JSON.stringify(value);
+      } else {
+        tokens[key] = String(value);
+      }
+    }
+  }
 
   const title = renderTemplate(candidate.rule.titleTemplate, tokens).trim();
 
@@ -210,6 +225,7 @@ export async function runSync(
       const payload = buildTaskPayload(
         app,
         candidate,
+        settings,
         effectiveProjectId,
         candidate.rule.targetProjectName || project.name,
         effectiveTaskId,

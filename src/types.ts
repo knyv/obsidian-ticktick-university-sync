@@ -59,6 +59,7 @@ export interface TickTickUniversitySyncSettings {
 
   trackingMode: TrackingMode;
   localTrackingFile: string;
+  allowAllPropertyTokens: boolean;
 
   rules: SyncRule[];
 }

@@ -56,12 +56,12 @@ function addOAuthGuideBlock(containerEl: HTMLElement): void {
   const block = addInfoBlock(containerEl, 'How to connect TickTick (beginner path)');
   const ol = block.createEl('ol');
   [
-    'Click "Open TickTick Developer Apps".',
+    'Open TickTick Developer Apps.',
     'Create/select an app and set Redirect URI to EXACTLY: https://localhost/',
     'Copy Client ID + Client Secret into this page.',
-    'Click "Open OAuth URL" and approve access in browser.',
+    'Open OAuth URL and approve access in browser.',
     'Copy final redirect URL from browser address bar.',
-    'Click "Exchange from Clipboard" (fastest) or use Manual Exchange.',
+    'Exchange from Clipboard (fastest) or use Manual Exchange.',
   ].forEach((step) => ol.createEl('li', { text: step }));
   block.createEl('p', {
     text: 'Important: Redirect URI must match exactly in BOTH places, including trailing slash.',
@@ -81,14 +81,15 @@ function addRulesGuideBlock(containerEl: HTMLElement): void {
   ].forEach((line) => ul.createEl('li', { text: line }));
 }
 
-function addFormattingGuideBlock(containerEl: HTMLElement): void {
+function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyTokens: boolean): void {
   const block = addInfoBlock(containerEl, 'Task formatting help');
   const ul = block.createEl('ul');
   [
     'Title/content/description are optional templates sent to TickTick.',
-    'Tokens supported: {{noteTitle}}, {{duePretty}}, {{class}}, {{obsidianLink}}, etc.',
+    'Built-in tokens: {{noteTitle}}, {{duePretty}}, {{class}}, {{obsidianLink}}, {{status}}, {{tags}}, {{projectName}}.',
     'Press Enter in the text box for real line breaks (recommended).',
     'Literal \\n is also supported and converted automatically.',
+    `Custom property tokens: ${allowAllPropertyTokens ? 'enabled' : 'disabled'} (for example {{priority}}).`,
     'Use preset buttons first, then tweak.',
   ].forEach((line) => ul.createEl('li', { text: line }));
 }
@@ -253,7 +254,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl('h5', { text: 'D) Task formatting' });
-    addFormattingGuideBlock(containerEl);
+    addFormattingGuideBlock(containerEl, this.plugin.settings.allowAllPropertyTokens);
 
     new Setting(containerEl)
       .setName('Formatting presets')
@@ -484,7 +485,7 @@ Rule: {{ruleName}}`;
 
     const oauthWrap = containerEl.createEl('div', { cls: 'ticktick-flow-actions-grid' });
 
-    const oauthStep1 = new Setting(oauthWrap).setName('Step 1').setDesc('Open TickTick developer app settings');
+    const oauthStep1 = new Setting(oauthWrap).setName('Beginner path: step 1').setDesc('Open TickTick developer app settings');
     oauthStep1
       .addButton((btn) =>
         btn.setButtonText('Open TickTick Developer Apps').setClass('mod-cta').onClick(() => {
@@ -493,7 +494,7 @@ Rule: {{ruleName}}`;
       )
       .settingEl.addClass('ticktick-flow-action-row');
 
-    const oauthStep2 = new Setting(oauthWrap).setName('Step 2').setDesc('Open OAuth consent page in browser');
+    const oauthStep2 = new Setting(oauthWrap).setName('Beginner path: step 2').setDesc('Open OAuth consent page in browser');
     oauthStep2
       .addButton((btn) =>
         btn.setButtonText('Open OAuth URL').onClick(() => {
@@ -502,7 +503,7 @@ Rule: {{ruleName}}`;
       )
       .settingEl.addClass('ticktick-flow-action-row');
 
-    const oauthStep3 = new Setting(oauthWrap).setName('Step 3').setDesc('Exchange redirect URL/code from clipboard');
+    const oauthStep3 = new Setting(oauthWrap).setName('Beginner path: step 3').setDesc('Exchange redirect URL/code from clipboard');
     oauthStep3
       .addButton((btn) =>
         btn.setButtonText('Exchange from Clipboard').onClick(async () => {
@@ -516,7 +517,7 @@ Rule: {{ruleName}}`;
       )
       .settingEl.addClass('ticktick-flow-action-row');
 
-    const oauthStep4 = new Setting(oauthWrap).setName('Alternative').setDesc('If clipboard fails, paste manually');
+    const oauthStep4 = new Setting(oauthWrap).setName('Beginner path: alternative').setDesc('If clipboard fails, paste manually');
     oauthStep4
       .addButton((btn) =>
         btn.setButtonText('Manual Exchange').onClick(() => {
@@ -624,6 +625,17 @@ Rule: {{ruleName}}`;
           }),
         );
     }
+
+    new Setting(containerEl)
+      .setName('Template token mode')
+      .setDesc('Enable custom {{property}} tokens from note frontmatter in templates')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.allowAllPropertyTokens).onChange(async (value) => {
+          this.plugin.settings.allowAllPropertyTokens = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
 
     new Setting(containerEl)
       .setName('Run sync now')

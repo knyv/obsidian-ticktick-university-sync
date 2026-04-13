@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: TickTickUniversitySyncSettings = {
 
   trackingMode: 'frontmatter',
   localTrackingFile: '.obsidian/plugins/ticktick-flow-sync/tracking.json',
+  allowAllPropertyTokens: true,
 
   rules: [makeUniversityRule()],
 };
@@ -104,6 +105,9 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
   if (!merged.trackingMode) merged.trackingMode = 'frontmatter';
   if (!merged.localTrackingFile?.trim()) {
     merged.localTrackingFile = '.obsidian/plugins/ticktick-flow-sync/tracking.json';
+  }
+  if (typeof merged.allowAllPropertyTokens !== 'boolean') {
+    merged.allowAllPropertyTokens = true;
   }
   if (merged.localTrackingFile.trim() === '.obsidian/plugins/ticktick-university-sync/tracking.json') {
     merged.localTrackingFile = '.obsidian/plugins/ticktick-flow-sync/tracking.json';
