@@ -76,11 +76,21 @@ export class TickTickClient {
   }
 
   async completeTask(projectId: string, taskId: string): Promise<void> {
-    await this.request(
-      `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}/complete`,
-      'POST',
-      {},
-    );
+    try {
+      await this.request(
+        `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}/complete`,
+        'POST',
+        {},
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // TickTick complete endpoint can return empty body; some clients surface JSON parse error even when completion succeeded.
+      if (msg.toLowerCase().includes('unexpected end of json input')) {
+        console.warn('[TickTick Flow Sync] Ignoring empty-body JSON parse error from complete endpoint', { projectId, taskId });
+        return;
+      }
+      throw e;
+    }
   }
 
   async listKnownTags(maxProjects: number = 25): Promise<string[]> {
