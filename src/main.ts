@@ -83,7 +83,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-discover-projects',
-      name: 'Projects: auto-select target project for first rule',
+      name: 'Projects: validate and refresh selected target projects',
       callback: async () => {
         await this.discoverAndSelectProject();
       },
@@ -247,38 +247,49 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       const rule = this.settings.rules.find((r) => r.id === ruleId);
       if (!rule) throw new Error(`Rule not found: ${ruleId}`);
 
-      const wanted = rule.targetProjectName.trim().toLowerCase();
-      let selected = projects.find((p) => p.name.toLowerCase() === wanted);
-      if (!selected) {
-        selected = projects.find((p) => p.name.toLowerCase() === 'inbox') ?? projects[0];
+      if (rule.targetProjectId) {
+        const match = projects.find((p) => p.id === rule.targetProjectId);
+        if (match) {
+          rule.targetProjectName = match.name;
+          await this.saveSettings();
+          new Notice(`Rule '${rule.name}' project is valid: ${match.name}`);
+          return;
+        }
       }
 
-      rule.targetProjectId = selected.id;
-      rule.targetProjectName = selected.name;
-      await this.saveSettings();
-      new Notice(`Selected project for rule '${rule.name}': ${selected.name}`);
+      const byName = projects.find((p) => p.name.toLowerCase() === (rule.targetProjectName || '').trim().toLowerCase());
+      if (byName) {
+        rule.targetProjectId = byName.id;
+        rule.targetProjectName = byName.name;
+        await this.saveSettings();
+        new Notice(`Rule '${rule.name}' project refreshed by name: ${byName.name}`);
+        return;
+      }
+
+      new Notice(`Rule '${rule.name}' has no valid target project. Select one in rule settings.`);
       return;
     }
 
-    const firstRule = this.settings.rules[0];
-    if (!firstRule) {
-      new Notice('No rules configured. Add one first in settings.');
-      return;
+    let refreshed = 0;
+    let invalid = 0;
+
+    for (const rule of this.settings.rules) {
+      if (!rule.targetProjectId) {
+        invalid += 1;
+        continue;
+      }
+
+      const match = projects.find((p) => p.id === rule.targetProjectId);
+      if (match) {
+        rule.targetProjectName = match.name;
+        refreshed += 1;
+      } else {
+        invalid += 1;
+      }
     }
 
-    const wanted = firstRule.targetProjectName.trim().toLowerCase();
-    let selected = projects.find((p) => p.name.toLowerCase() === wanted);
-    if (!selected) {
-      selected = projects.find((p) => ['university', 'school', 'study'].includes(p.name.toLowerCase())) ?? projects[0];
-    }
-
-    firstRule.targetProjectId = selected.id;
-    firstRule.targetProjectName = selected.name;
-    this.settings.fallbackProjectId = selected.id;
-    this.settings.fallbackProjectName = selected.name;
     await this.saveSettings();
-
-    new Notice(`Selected TickTick project: ${selected.name}`);
+    new Notice(`Project validation complete: ${refreshed} valid, ${invalid} need re-selection.`);
   }
 
   async testConnection() {

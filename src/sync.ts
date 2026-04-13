@@ -161,31 +161,36 @@ async function updateFrontmatterTracking(
 
 async function ensureRuleProject(
   client: TickTickClient,
-  settings: TickTickUniversitySyncSettings,
   rule: SyncRule,
 ): Promise<{ id: string; name: string }> {
-  if (rule.targetProjectId) {
-    return { id: rule.targetProjectId, name: rule.targetProjectName || settings.fallbackProjectName };
-  }
-
   const projects = await client.listProjects();
-  const wanted = rule.targetProjectName.trim().toLowerCase() || settings.fallbackProjectName.trim().toLowerCase();
 
-  let selected = projects.find((p) => p.name.toLowerCase() === wanted);
-  if (!selected) {
-    selected =
-      projects.find((p) => ['university', 'school', 'study'].includes(p.name.toLowerCase())) ??
-      projects.find((p) => p.name.toLowerCase() === 'inbox') ??
-      projects[0];
+  if (!projects.length) {
+    throw new Error(`No TickTick projects available. Create one in TickTick first.`);
   }
 
-  if (!selected) {
-    throw new Error(`No TickTick project found for rule '${rule.name}'.`);
+  if (rule.targetProjectId) {
+    const byId = projects.find((p) => p.id === rule.targetProjectId);
+    if (byId) {
+      rule.targetProjectName = byId.name;
+      return { id: byId.id, name: byId.name };
+    }
+
+    const byName = projects.find(
+      (p) => p.name.toLowerCase() === (rule.targetProjectName || '').trim().toLowerCase(),
+    );
+    if (byName) {
+      rule.targetProjectId = byName.id;
+      rule.targetProjectName = byName.name;
+      return { id: byName.id, name: byName.name };
+    }
+
+    throw new Error(
+      `Rule '${rule.name}' target project is invalid (saved project not found). Re-select target project in rule settings.`,
+    );
   }
 
-  rule.targetProjectId = selected.id;
-  rule.targetProjectName = selected.name;
-  return { id: selected.id, name: selected.name };
+  throw new Error(`Rule '${rule.name}' has no target project selected. Select one in rule settings.`);
 }
 
 export async function runSync(
@@ -211,7 +216,7 @@ export async function runSync(
   for (const candidate of candidates) {
     try {
       const completed = isCompletedStatus(candidate.statusRaw, candidate.rule.completedKeywords);
-      const project = await ensureRuleProject(client, settings, candidate.rule);
+      const project = await ensureRuleProject(client, candidate.rule);
 
       const tracked = await tracking.read(candidate);
       const effectiveTaskId = candidate.taskId || tracked?.taskId;

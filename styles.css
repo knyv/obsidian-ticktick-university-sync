@@ -132,8 +132,17 @@
   background: var(--background-secondary);
 }
 
+.ticktick-flow-add-rule-row .setting-item {
+  align-items: center;
+}
+
+.ticktick-flow-add-rule-row .setting-item-info {
+  flex: 1;
+}
+
 .ticktick-flow-add-rule-row .setting-item-control {
-  min-width: 280px;
+  width: 320px;
+  min-width: 320px;
   justify-content: flex-end;
 }
 

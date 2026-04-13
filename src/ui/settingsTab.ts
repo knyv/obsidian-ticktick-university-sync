@@ -320,7 +320,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Target project (dropdown)')
-      .setDesc('Click "Load project list" in Account Setup first, then select here.')
+      .setDesc('Select TickTick project for this rule (load projects first in Account Setup).')
       .addDropdown((d) => {
         const options = this.projectDropdownOptions(rule);
         Object.entries(options).forEach(([id, name]) => d.addOption(id, name));
@@ -330,17 +330,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           if (selected) rule.targetProjectName = selected.name;
           await this.plugin.saveSettings();
         });
-      })
-      .addButton((btn) =>
-        btn.setButtonText('Auto-pick').onClick(async () => {
-          try {
-            await this.plugin.discoverAndSelectProject(rule.id);
-            this.display();
-          } catch (e) {
-            new Notice(e instanceof Error ? e.message : String(e));
-          }
-        }),
-      );
+      });
 
     containerEl.createEl('h5', { text: 'C) Sync behavior' });
 
@@ -650,21 +640,14 @@ Rule: {{ruleName}}`;
 
     new Setting(containerEl)
       .setName('Connection & projects')
-      .setDesc('Recommended: click "Load + test + prefill projects" first')
+      .setDesc('Recommended: click "Load + test projects" first, then choose project per rule')
       .addButton((btn) =>
-        btn.setButtonText('Load + test + prefill projects').setClass('mod-cta').onClick(async () => {
+        btn.setButtonText('Load + test projects').setClass('mod-cta').onClick(async () => {
           try {
             await this.plugin.testConnection();
             await this.plugin.preloadProjects();
-
-            for (const rule of this.plugin.settings.rules) {
-              if (!rule.targetProjectId) {
-                await this.plugin.discoverAndSelectProject(rule.id);
-              }
-            }
-
             this.projects = await this.plugin.listProjects();
-            new Notice(`Ready: loaded ${this.projects.length} projects and prefilled missing rule project targets.`);
+            new Notice(`Ready: loaded ${this.projects.length} projects. Now select target project per rule.`);
             this.display();
           } catch (e) {
             new Notice(e instanceof Error ? e.message : String(e));

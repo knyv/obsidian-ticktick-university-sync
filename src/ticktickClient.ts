@@ -35,8 +35,9 @@ export class TickTickClient {
     }
 
     if (res.status < 200 || res.status >= 300) {
-      console.error('[TickTick University Sync] API error:', method, path, res.status, res.text);
-      throw new Error(`TickTick API ${method} ${path} failed (${res.status})`);
+      console.error('[TickTick Flow Sync] API error:', method, path, res.status, res.text);
+      const detail = (res.text || '').slice(0, 180).replace(/\s+/g, ' ').trim();
+      throw new Error(`TickTick API ${method} ${path} failed (${res.status})${detail ? `: ${detail}` : ''}`);
     }
 
     return (res.json ?? {}) as T;
