@@ -22,9 +22,15 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     syncMode: 'upsert',
     completedKeywords: ['completed', 'complete', 'done', 'finished'],
     titleTemplate: '{{noteTitle}}',
-    contentTemplate:
-      '📌 {{noteTitle}}\\n📚 Class: {{class}}\\n📅 Due: {{duePretty}}\\n🏷 Tags: {{tags}}\\n🔗 Open note: {{obsidianLink}}\\n📂 Path: {{filePath}}\\n⚙️ Rule: {{ruleName}}',
-    descTemplate: 'Status: {{status}}\\nProject: {{projectName}}',
+    contentTemplate: `Task: {{noteTitle}}
+Class: {{class}}
+Due: {{duePretty}}
+Tags: {{tags}}
+Open note: {{obsidianLink}}`,
+    descTemplate: `Status: {{status}}
+Project: {{projectName}}
+Path: {{filePath}}
+Rule: {{ruleName}}`,
     ...overrides,
   };
 }
@@ -106,9 +112,23 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
   // normalize missing desc template in older rules
   merged.rules = merged.rules.map((rule) => ({
     ...rule,
-    descTemplate: typeof (rule as { descTemplate?: unknown }).descTemplate === 'string'
-      ? String((rule as { descTemplate?: unknown }).descTemplate)
-      : 'Status: {{status}}\\nProject: {{projectName}}',
+    contentTemplate:
+      typeof (rule as { contentTemplate?: unknown }).contentTemplate === 'string' &&
+      String((rule as { contentTemplate?: unknown }).contentTemplate).trim()
+        ? String((rule as { contentTemplate?: unknown }).contentTemplate)
+        : `Task: {{noteTitle}}
+Class: {{class}}
+Due: {{duePretty}}
+Tags: {{tags}}
+Open note: {{obsidianLink}}`,
+    descTemplate:
+      typeof (rule as { descTemplate?: unknown }).descTemplate === 'string' &&
+      String((rule as { descTemplate?: unknown }).descTemplate).trim()
+        ? String((rule as { descTemplate?: unknown }).descTemplate)
+        : `Status: {{status}}
+Project: {{projectName}}
+Path: {{filePath}}
+Rule: {{ruleName}}`,
   }));
 
   return merged;

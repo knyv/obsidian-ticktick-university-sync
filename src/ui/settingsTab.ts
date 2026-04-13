@@ -103,22 +103,30 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  private async addRuleFromPreset(preset: 'university' | 'personal' | 'work') {
+  private async addRuleFromPreset(preset: 'academic-deadlines' | 'personal-tasks' | 'work-items') {
     let rule: SyncRule;
-    if (preset === 'university') {
-      rule = makeUniversityRule({ id: makeRuleId('university'), name: 'University' });
-    } else if (preset === 'personal') {
+    if (preset === 'academic-deadlines') {
       rule = makeUniversityRule({
-        id: makeRuleId('personal'),
-        name: 'Personal Tasks',
+        id: makeRuleId('academic-deadlines'),
+        name: 'Academic deadlines',
+        tagsAny: ['university/assignments', 'university/exams'],
+        dueFields: ['due', 'deadline', 'exam_date'],
+        targetProjectName: 'University',
+      });
+    } else if (preset === 'personal-tasks') {
+      rule = makeUniversityRule({
+        id: makeRuleId('personal-tasks'),
+        name: 'Personal tasks',
         tagsAny: ['tasks/personal'],
+        dueFields: ['due', 'deadline'],
         targetProjectName: 'Inbox',
       });
     } else {
       rule = makeUniversityRule({
-        id: makeRuleId('work'),
-        name: 'Work',
+        id: makeRuleId('work-items'),
+        name: 'Work items',
         tagsAny: ['tasks/work'],
+        dueFields: ['due', 'deadline'],
         targetProjectName: 'Work',
       });
     }
@@ -253,8 +261,12 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn.setButtonText('Clean').onClick(async () => {
           rule.titleTemplate = '{{noteTitle}}';
-          rule.contentTemplate = '📅 Due: {{duePretty}}\\n📚 Class: {{class}}\\n🔗 {{obsidianLink}}';
-          rule.descTemplate = 'Path: {{filePath}}\\nTags: {{tags}}\\nRule: {{ruleName}}';
+          rule.contentTemplate = `Due: {{duePretty}}
+Class: {{class}}
+Open note: {{obsidianLink}}`;
+          rule.descTemplate = `Path: {{filePath}}
+Tags: {{tags}}
+Rule: {{ruleName}}`;
           await this.plugin.saveSettings();
           this.display();
         }),
@@ -262,8 +274,15 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn.setButtonText('Detailed').onClick(async () => {
           rule.titleTemplate = '{{noteTitle}} · {{duePretty}}';
-          rule.contentTemplate = '📌 {{noteTitle}}\\n📅 {{duePretty}}\\n📚 {{class}}\\n🏷 {{tags}}';
-          rule.descTemplate = 'Status: {{status}}\\nProject: {{projectName}}\\nOpen: {{obsidianLink}}\\nPath: {{filePath}}\\nRule: {{ruleName}}';
+          rule.contentTemplate = `Task: {{noteTitle}}
+Due: {{duePretty}}
+Class: {{class}}
+Tags: {{tags}}
+Open note: {{obsidianLink}}`;
+          rule.descTemplate = `Status: {{status}}
+Project: {{projectName}}
+Path: {{filePath}}
+Rule: {{ruleName}}`;
           await this.plugin.saveSettings();
           this.display();
         }),
@@ -623,20 +642,20 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Create rule from preset')
-      .setDesc('Start with one of these and edit as needed')
+      .setDesc('Choose based on what the rule does')
       .addButton((btn) =>
-        btn.setButtonText('University').onClick(async () => {
-          await this.addRuleFromPreset('university');
+        btn.setButtonText('Academic deadlines').onClick(async () => {
+          await this.addRuleFromPreset('academic-deadlines');
         }),
       )
       .addButton((btn) =>
-        btn.setButtonText('Personal').onClick(async () => {
-          await this.addRuleFromPreset('personal');
+        btn.setButtonText('Personal tasks').onClick(async () => {
+          await this.addRuleFromPreset('personal-tasks');
         }),
       )
       .addButton((btn) =>
-        btn.setButtonText('Work').onClick(async () => {
-          await this.addRuleFromPreset('work');
+        btn.setButtonText('Work items').onClick(async () => {
+          await this.addRuleFromPreset('work-items');
         }),
       );
 
