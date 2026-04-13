@@ -9,6 +9,7 @@ export interface PluginApi {
   testConnection: () => Promise<void>;
   listProjects: () => Promise<TickTickProject[]>;
   preloadProjects: () => Promise<void>;
+  listKnownTags: () => Promise<string[]>;
   openTickTickDeveloperPage: () => void;
   openOAuthUrl: () => void;
   exchangeAuthCode: (input: string) => Promise<void>;

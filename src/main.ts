@@ -273,6 +273,10 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     }
   }
 
+  async listKnownTags() {
+    return this.client.listKnownTags();
+  }
+
   async discoverAndSelectProject(ruleId?: string) {
     const projects = await this.listProjects();
     if (!projects.length) {

@@ -173,8 +173,9 @@ TickTick tags mapping:
 - Existing options retained:
   - source from note tags OR include-tags
   - optional frontmatter tags field (`ticktick_tags`)
-- New option:
+- New options:
   - fixed per-rule TickTick tags (`Fixed TickTick tags`) always appended to matching tasks
+  - `Suggest` button (best-effort) pulls known tags from current TickTick tasks and appends up to 8 unseen tags
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
 ## Commands

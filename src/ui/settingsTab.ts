@@ -625,6 +625,25 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
               rule.fixedTickTickTags = csvToList(value);
               await this.plugin.saveSettings();
             }),
+        )
+        .addButton((btn) =>
+          btn.setButtonText('Suggest').onClick(async () => {
+            try {
+              const tags = await this.plugin.listKnownTags();
+              if (!tags.length) {
+                new Notice('No TickTick tags found yet.');
+                return;
+              }
+              const current = new Set(rule.fixedTickTickTags || []);
+              const toAdd = tags.filter((t) => !current.has(t)).slice(0, 8);
+              rule.fixedTickTickTags = Array.from(new Set([...(rule.fixedTickTickTags || []), ...toAdd]));
+              await this.plugin.saveSettings();
+              new Notice(`Added ${toAdd.length} suggested tags to this rule.`);
+              this.display();
+            } catch (e) {
+              new Notice(e instanceof Error ? e.message : String(e));
+            }
+          }),
         );
     }
 

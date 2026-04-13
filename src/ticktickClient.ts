@@ -67,4 +67,30 @@ export class TickTickClient {
       {},
     );
   }
+
+  async listKnownTags(maxProjects: number = 25): Promise<string[]> {
+    const projects = await this.listProjects();
+    const tags = new Set<string>();
+
+    for (const p of projects.slice(0, Math.max(1, maxProjects))) {
+      try {
+        const data = await this.request<{ tasks?: Array<{ tags?: string[] }> }>(
+          `/open/v1/project/${encodeURIComponent(p.id)}/data`,
+          'GET',
+        );
+        const tasks = Array.isArray(data?.tasks) ? data.tasks : [];
+        for (const t of tasks) {
+          const taskTags = Array.isArray(t?.tags) ? t.tags : [];
+          for (const tag of taskTags) {
+            const normalized = String(tag || '').trim();
+            if (normalized) tags.add(normalized);
+          }
+        }
+      } catch {
+        // best-effort suggestions only
+      }
+    }
+
+    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+  }
 }
