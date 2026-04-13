@@ -17,6 +17,7 @@ function listToCsv(v: string[]): string {
 }
 
 type ChecklistItem = { done: boolean; text: string };
+type SettingsPane = 'setup' | 'rules' | 'advanced';
 
 function setupChecklist(plugin: PluginApi): { items: ChecklistItem[]; tokenExpiry: string } {
   const hasClient = Boolean(plugin.settings.clientId && plugin.settings.clientSecret);
@@ -75,7 +76,7 @@ function addRulesGuideBlock(containerEl: HTMLElement): void {
   [
     'A note matches when it has ANY include tag and NONE of the exclude tags.',
     'Due date uses the first non-empty key in Due fields list (left to right).',
-    'Use one rule per context: Deadlines, Work items, Personal tasks.',
+    'Use one rule per context: Deadlines, Work items, Personal tasks, or General tasks.',
     'Each rule is grouped into: Match notes -> Project target -> Sync behavior -> Task formatting.',
     'Project target must be explicitly selected for each enabled rule.',
     'Start with Dry run before real sync.',
@@ -146,34 +147,37 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   plugin: PluginApi;
   private projects: TickTickProject[] = [];
   private showAdvanced = false;
-  private selectedCustomPresetId = '';
+  private activePane: SettingsPane = 'setup';
   private expandedRuleIds = new Set<string>();
   private expansionInitialized = false;
+  private presetEditorOpenByRuleId = new Set<string>();
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
     this.plugin = plugin;
   }
 
-  private async addRuleFromPreset(preset: 'deadlines' | 'personal-tasks' | 'work-items' | 'custom') {
-    let rule: SyncRule;
+  private async addRuleFromPreset(preset: 'deadlines' | 'personal-tasks' | 'work-items' | 'general-tasks') {
+    const builtIn = this.plugin.getBuiltInPresets().find((p) => p.id === preset);
+    if (!builtIn) throw new Error(`Preset not found: ${preset}`);
 
-    if (preset === 'custom') {
-      const list = this.plugin.settings.customPresets;
-      const custom =
-        list.find((p) => p.id === this.selectedCustomPresetId) ??
-        list[0];
-      if (!custom) {
-        new Notice('No custom presets yet. Save one first.');
-        return;
-      }
-      rule = this.ruleFromPreset(custom);
-    } else {
-      const builtIn = this.plugin.getBuiltInPresets().find((p) => p.id === preset);
-      if (!builtIn) throw new Error(`Preset not found: ${preset}`);
-      rule = this.ruleFromPreset(builtIn);
+    const rule = this.ruleFromPreset(builtIn);
+    this.plugin.settings.rules.push(rule);
+    this.expandedRuleIds.clear();
+    this.expandedRuleIds.add(rule.id);
+    this.expansionInitialized = true;
+    await this.plugin.saveSettings();
+    this.display();
+  }
+
+  private async addRuleFromCustomPresetId(presetId: string) {
+    const custom = this.plugin.settings.customPresets.find((p) => p.id === presetId);
+    if (!custom) {
+      new Notice('Custom preset not found.');
+      return;
     }
 
+    const rule = this.ruleFromPreset(custom);
     this.plugin.settings.rules.push(rule);
     this.expandedRuleIds.clear();
     this.expandedRuleIds.add(rule.id);
@@ -211,6 +215,21 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       dueFields: [...preset.dueFields],
       targetProjectName: preset.targetProjectName,
       syncMode: preset.syncMode,
+      requireDueDate: preset.requireDueDate ?? true,
+      markCompletedInTickTick: preset.markCompletedInTickTick ?? true,
+      includeCompletedWithoutTaskId: preset.includeCompletedWithoutTaskId ?? false,
+      candidateSelectionMode: preset.candidateSelectionMode ?? 'all',
+      dueWindowMode: preset.dueWindowMode ?? 'all',
+      completedKeywords: Array.isArray(preset.completedKeywords) && preset.completedKeywords.length
+        ? [...preset.completedKeywords]
+        : ['completed', 'complete', 'done', 'finished'],
+      titleTemplate: preset.titleTemplate || '{{noteTitle}}',
+      contentTemplate: preset.contentTemplate || '',
+      descTemplate: preset.descTemplate || 'Open note: {{obsidianMdLink}}\nPath: {{filePath}}',
+      ticktickTagsField: preset.ticktickTagsField || 'ticktick_tags',
+      tagSourceMode: preset.tagSourceMode === 'include_tags' ? 'include_tags' : 'all_note_tags',
+      statusField: preset.statusField || 'status',
+      classField: preset.classField || 'class',
     });
   }
 
@@ -585,28 +604,89 @@ Path: {{filePath}}`;
     }
 
     new Setting(containerEl)
-      .setName('Delete this rule')
-      .setDesc('Removes this rule completely.')
+      .setName('Rule actions')
+      .setDesc('Save this exact rule as preset, duplicate it, or delete it.')
+      .addButton((btn) =>
+        btn.setButtonText('Save as preset').onClick(() => {
+          if (this.presetEditorOpenByRuleId.has(rule.id)) this.presetEditorOpenByRuleId.delete(rule.id);
+          else this.presetEditorOpenByRuleId.add(rule.id);
+          this.display();
+        }),
+      )
+      .addButton((btn) =>
+        btn.setButtonText('Duplicate').onClick(async () => {
+          const copy = JSON.parse(JSON.stringify(rule)) as SyncRule;
+          copy.id = makeRuleId('rule');
+          copy.name = `${rule.name} copy`;
+          this.plugin.settings.rules.splice(idx + 1, 0, copy);
+          this.expandedRuleIds.add(copy.id);
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
       .addButton((btn) =>
         btn.setWarning().setButtonText('Delete').onClick(async () => {
-          const ok = window.confirm(`Delete rule "${rule.name}"? This cannot be undone.`);
+          const ok = window.confirm(`Delete rule \"${rule.name}\"? This cannot be undone.`);
           if (!ok) return;
           this.plugin.settings.rules = this.plugin.settings.rules.filter((r) => r.id !== rule.id);
           this.expandedRuleIds.delete(rule.id);
+          this.presetEditorOpenByRuleId.delete(rule.id);
           await this.plugin.saveSettings();
           this.display();
         }),
       );
+
+    if (this.presetEditorOpenByRuleId.has(rule.id)) {
+      const presetEditWrap = containerEl.createEl('div', { cls: 'ticktick-flow-preset-inline-editor' });
+      const suggestedName = `${rule.name} preset`;
+      const existing = this.plugin.settings.customPresets.find((p) => p.name.toLowerCase() === suggestedName.toLowerCase());
+      const nameInput = presetEditWrap.createEl('input') as HTMLInputElement;
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Preset name';
+      nameInput.value = existing?.name || suggestedName;
+
+      const descInput = presetEditWrap.createEl('input') as HTMLInputElement;
+      descInput.type = 'text';
+      descInput.placeholder = 'Preset description';
+      descInput.value = existing?.description || `Custom preset from rule: ${rule.name}`;
+
+      const actionRow = presetEditWrap.createEl('div', { cls: 'ticktick-flow-preset-inline-actions' });
+      const saveBtn = actionRow.createEl('button', { text: 'Save new preset' });
+      saveBtn.classList.add('mod-cta');
+      saveBtn.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+          new Notice('Preset name is required.');
+          return;
+        }
+        const description = descInput.value.trim();
+        await this.plugin.createCustomPresetFromRule(rule.id, name, description);
+        this.presetEditorOpenByRuleId.delete(rule.id);
+        this.display();
+      });
+
+      if (existing) {
+        const overwriteBtn = actionRow.createEl('button', { text: 'Replace existing preset' });
+        overwriteBtn.classList.add('mod-warning');
+        overwriteBtn.addEventListener('click', async () => {
+          const ok = window.confirm(`Replace preset \"${existing.name}\" with current rule config?`);
+          if (!ok) return;
+          await this.plugin.removeCustomPreset(existing.id);
+          await this.plugin.createCustomPresetFromRule(rule.id, nameInput.value.trim() || suggestedName, descInput.value.trim());
+          this.presetEditorOpenByRuleId.delete(rule.id);
+          this.display();
+        });
+      }
+
+      const cancelBtn = actionRow.createEl('button', { text: 'Cancel' });
+      cancelBtn.addEventListener('click', () => {
+        this.presetEditorOpenByRuleId.delete(rule.id);
+        this.display();
+      });
+    }
   }
 
-  async display(): Promise<void> {
-    const { containerEl } = this;
-    containerEl.empty();
-    this.ensureRuleExpansionState();
-
-    containerEl.createEl('h2', { text: 'TickTick Flow Sync' });
-    containerEl.createEl('p', { text: 'Beginner-friendly setup first. Advanced controls are optional.' });
-
+  private renderSetupPane(containerEl: HTMLElement) {
     containerEl.createEl('h3', { text: '1) Connect your TickTick account' });
     addChecklistBlock(containerEl, this.plugin);
     addOAuthGuideBlock(containerEl);
@@ -615,13 +695,10 @@ Path: {{filePath}}`;
       .setName('Client ID')
       .setDesc('From TickTick Developer Apps page')
       .addText((text) =>
-        text
-          .setPlaceholder('client id')
-          .setValue(this.plugin.settings.clientId)
-          .onChange(async (value) => {
-            this.plugin.settings.clientId = value.trim();
-            await this.plugin.saveSettings();
-          }),
+        text.setPlaceholder('client id').setValue(this.plugin.settings.clientId).onChange(async (value) => {
+          this.plugin.settings.clientId = value.trim();
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)
@@ -643,13 +720,10 @@ Path: {{filePath}}`;
       .setName('Redirect URI')
       .setDesc('Use exactly: https://localhost/  (must match TickTick app)')
       .addText((text) =>
-        text
-          .setPlaceholder('https://localhost/')
-          .setValue(this.plugin.settings.redirectUri)
-          .onChange(async (value) => {
-            this.plugin.settings.redirectUri = value.trim() || 'https://localhost/';
-            await this.plugin.saveSettings();
-          }),
+        text.setPlaceholder('https://localhost/').setValue(this.plugin.settings.redirectUri).onChange(async (value) => {
+          this.plugin.settings.redirectUri = value.trim() || 'https://localhost/';
+          await this.plugin.saveSettings();
+        }),
       )
       .addButton((btn) =>
         btn.setButtonText('Use recommended').onClick(async () => {
@@ -657,36 +731,19 @@ Path: {{filePath}}`;
           await this.plugin.saveSettings();
           this.display();
         }),
-      )
-      .addButton((btn) =>
-        btn.setButtonText('Copy').onClick(async () => {
-          try {
-            await navigator.clipboard.writeText(this.plugin.settings.redirectUri || 'https://localhost/');
-            new Notice('Redirect URI copied.');
-          } catch {
-            new Notice('Copy failed. Copy manually from field.');
-          }
-        }),
       );
 
     const oauthWrap = containerEl.createEl('div', { cls: 'ticktick-flow-actions-grid' });
-
     const oauthStep1 = new Setting(oauthWrap).setName('Beginner path: step 1').setDesc('Open TickTick developer app settings');
     oauthStep1
       .addButton((btn) =>
-        btn.setButtonText('Open TickTick Developer Apps').setClass('mod-cta').onClick(() => {
-          this.plugin.openTickTickDeveloperPage();
-        }),
+        btn.setButtonText('Open TickTick Developer Apps').setClass('mod-cta').onClick(() => this.plugin.openTickTickDeveloperPage()),
       )
       .settingEl.addClass('ticktick-flow-action-row');
 
     const oauthStep2 = new Setting(oauthWrap).setName('Beginner path: step 4').setDesc('Open OAuth consent page in browser');
     oauthStep2
-      .addButton((btn) =>
-        btn.setButtonText('Open OAuth URL').onClick(() => {
-          this.plugin.openOAuthUrl();
-        }),
-      )
+      .addButton((btn) => btn.setButtonText('Open OAuth URL').onClick(() => this.plugin.openOAuthUrl()))
       .settingEl.addClass('ticktick-flow-action-row');
 
     const oauthStep3 = new Setting(oauthWrap).setName('Beginner path: step 6').setDesc('Exchange redirect URL/code from clipboard');
@@ -716,19 +773,8 @@ Path: {{filePath}}`;
       .settingEl.addClass('ticktick-flow-action-row');
 
     new Setting(containerEl)
-      .setName('Simple mode')
-      .setDesc('Show beginner-focused settings first; hide extra complexity')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.simpleMode).onChange(async (value) => {
-          this.plugin.settings.simpleMode = value;
-          await this.plugin.saveSettings();
-          this.display();
-        }),
-      );
-
-    new Setting(containerEl)
       .setName('Connection & projects')
-      .setDesc('Recommended: click "Load + test projects" first, then choose project per enabled rule')
+      .setDesc('Click "Load + test projects", then select project per enabled rule. Project preloading also runs automatically after startup with delay.')
       .addButton((btn) =>
         btn.setButtonText('Load + test projects').setClass('mod-cta').onClick(async () => {
           try {
@@ -752,26 +798,139 @@ Path: {{filePath}}`;
             new Notice(e instanceof Error ? e.message : String(e));
           }
         }),
-      )
+      );
+
+    new Setting(containerEl)
+      .setName('Run sync now')
       .addButton((btn) =>
-        btn.setButtonText('Manual: load project list').onClick(async () => {
+        btn.setButtonText('Sync now').setCta().onClick(async () => {
           try {
-            this.projects = await this.plugin.listProjects();
-            new Notice(`Loaded ${this.projects.length} projects.`);
-            this.display();
+            await this.plugin.syncNow();
           } catch (e) {
             new Notice(e instanceof Error ? e.message : String(e));
           }
         }),
       );
+  }
 
-    containerEl.createEl('h3', { text: '2) Sync behavior (global)' });
+  private renderRulesPane(containerEl: HTMLElement) {
+    containerEl.createEl('h3', { text: '2) Rules (what gets synced)' });
+    addRulesGuideBlock(containerEl);
+
+    containerEl.createEl('h4', { text: 'Add new rule' });
+    const addRuleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-add-rule-grid' });
+
+    const addBlank = new Setting(addRuleWrap)
+      .setName('Start from scratch')
+      .setDesc('Create an empty rule with sensible defaults you can edit')
+      .addButton((btn) => btn.setButtonText('+ Create blank rule').setClass('mod-cta').onClick(async () => this.addBlankRule()));
+    addBlank.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addDeadlines = new Setting(addRuleWrap)
+      .setName('Preset: Deadlines')
+      .setDesc('Due-date focused notes (generic). For full control, use + Create blank rule.')
+      .addButton((btn) => btn.setButtonText('+ Add Deadlines rule').onClick(async () => this.addRuleFromPreset('deadlines')));
+    addDeadlines.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addPersonal = new Setting(addRuleWrap)
+      .setName('Preset: Personal tasks')
+      .setDesc('Personal/home/admin style tasks')
+      .addButton((btn) => btn.setButtonText('+ Add Personal tasks rule').onClick(async () => this.addRuleFromPreset('personal-tasks')));
+    addPersonal.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addWork = new Setting(addRuleWrap)
+      .setName('Preset: Work items')
+      .setDesc('Work/project related tasks')
+      .addButton((btn) => btn.setButtonText('+ Add Work items rule').onClick(async () => this.addRuleFromPreset('work-items')));
+    addWork.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addGeneral = new Setting(addRuleWrap)
+      .setName('Preset: General tasks')
+      .setDesc('General tasks mode (due date optional)')
+      .addButton((btn) => btn.setButtonText('+ Add General tasks rule').onClick(async () => this.addRuleFromPreset('general-tasks')));
+    addGeneral.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    addPresetGuideBlock(containerEl, this.plugin);
+
+    if (this.plugin.settings.customPresets.length > 0) {
+      const customWrap = containerEl.createEl('div', { cls: 'ticktick-flow-preset-manager' });
+      customWrap.createEl('h4', { text: 'Apply saved custom preset' });
+      this.plugin.settings.customPresets.forEach((preset) => {
+        const row = new Setting(customWrap)
+          .setName(preset.name)
+          .setDesc(preset.description || 'No description')
+          .addButton((btn) =>
+            btn.setButtonText('Add rule from preset').onClick(async () => {
+              await this.addRuleFromCustomPresetId(preset.id);
+            }),
+          );
+        row.settingEl.addClass('ticktick-flow-add-rule-row');
+      });
+    }
+
+    if (this.plugin.settings.rules.length > 0) {
+      const presetManagerWrap = containerEl.createEl('div', { cls: 'ticktick-flow-preset-manager' });
+      presetManagerWrap.createEl('h4', { text: 'Manage custom presets' });
+      presetManagerWrap.createEl('p', { text: 'Delete presets you no longer need. Save/update from each rule card via Rule actions.' });
+
+
+      if (this.plugin.settings.customPresets.length > 0) {
+        this.plugin.settings.customPresets.forEach((preset) => {
+          const row = new Setting(presetManagerWrap)
+            .setName(`Preset: ${preset.name}`)
+            .setDesc(preset.description || 'No description')
+            .addButton((btn) =>
+              btn.setButtonText('Delete').setWarning().onClick(async () => {
+                const ok = window.confirm(`Delete custom preset "${preset.name}"?`);
+                if (!ok) return;
+                await this.plugin.removeCustomPreset(preset.id);
+                this.display();
+              }),
+            );
+          row.settingEl.addClass('ticktick-flow-add-rule-row');
+        });
+      }
+    }
+
+    if (!this.plugin.settings.simpleMode) {
+      new Setting(containerEl)
+        .setName('Advanced mode (rule details)')
+        .addToggle((toggle) =>
+          toggle.setValue(this.showAdvanced).onChange(async (value) => {
+            this.showAdvanced = value;
+            this.display();
+          }),
+        );
+    } else {
+      this.showAdvanced = false;
+    }
+
+    for (let i = 0; i < this.plugin.settings.rules.length; i += 1) {
+      const ruleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-rule' });
+      this.renderRule(ruleWrap, this.plugin.settings.rules[i], i);
+    }
+  }
+
+  private renderAdvancedPane(containerEl: HTMLElement) {
+    containerEl.createEl('h3', { text: '3) Advanced & performance' });
+
+    if (this.plugin.settings.simpleMode) {
+      containerEl.createEl('p', { text: 'Simple mode is ON. These controls are optional; change only if needed.' });
+    }
 
     new Setting(containerEl)
       .setName('Sync on startup')
+      .setDesc('Runs one delayed sync after startup if already connected')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.syncOnStartup).onChange(async (value) => {
           this.plugin.settings.syncOnStartup = value;
+          await this.plugin.saveSettings();
+        }),
+      )
+      .addText((text) =>
+        text.setPlaceholder('startup sync delay ms (e.g. 6000)').setValue(String(this.plugin.settings.startupSyncDelayMs || 0)).onChange(async (value) => {
+          const n = Number(value);
+          this.plugin.settings.startupSyncDelayMs = Number.isFinite(n) && n >= 0 ? n : 6000;
           await this.plugin.saveSettings();
         }),
       );
@@ -780,19 +939,16 @@ Path: {{filePath}}`;
       .setName('Auto-sync interval (minutes)')
       .setDesc('0 disables periodic sync.')
       .addText((text) =>
-        text
-          .setPlaceholder('0')
-          .setValue(String(this.plugin.settings.autoSyncMinutes))
-          .onChange(async (value) => {
-            const n = Number(value);
-            this.plugin.settings.autoSyncMinutes = Number.isFinite(n) && n >= 0 ? n : 0;
-            await this.plugin.saveSettings();
-          }),
+        text.setPlaceholder('0').setValue(String(this.plugin.settings.autoSyncMinutes)).onChange(async (value) => {
+          const n = Number(value);
+          this.plugin.settings.autoSyncMinutes = Number.isFinite(n) && n >= 0 ? n : 0;
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)
       .setName('Dry run')
-      .setDesc('Safe mode: evaluate only, do not create/update/complete tasks.')
+      .setDesc('Evaluate only, do not write to TickTick.')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.dryRun).onChange(async (value) => {
           this.plugin.settings.dryRun = value;
@@ -818,7 +974,6 @@ Path: {{filePath}}`;
     if ((this.plugin.settings.trackingMode as TrackingMode) === 'local_json') {
       new Setting(containerEl)
         .setName('Local tracking file')
-        .setDesc('Path inside vault for mapping note -> TickTick task IDs.')
         .addText((text) =>
           text.setValue(this.plugin.settings.localTrackingFile).onChange(async (value) => {
             this.plugin.settings.localTrackingFile = value.trim() || '.obsidian/plugins/ticktick-flow-sync/tracking.json';
@@ -829,12 +984,11 @@ Path: {{filePath}}`;
 
     new Setting(containerEl)
       .setName('Template token mode')
-      .setDesc('Enable custom {{property}} tokens from note frontmatter in templates')
+      .setDesc('Enable custom {{property}} tokens from note frontmatter')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.allowAllPropertyTokens).onChange(async (value) => {
           this.plugin.settings.allowAllPropertyTokens = value;
           await this.plugin.saveSettings();
-          this.display();
         }),
       );
 
@@ -849,185 +1003,30 @@ Path: {{filePath}}`;
         }),
       )
       .addText((text) =>
-        text
-          .setPlaceholder('delay ms (e.g. 3500)')
-          .setValue(String(this.plugin.settings.preloadProjectsDelayMs || 0))
-          .onChange(async (value) => {
-            const n = Number(value);
-            this.plugin.settings.preloadProjectsDelayMs = Number.isFinite(n) && n >= 0 ? n : 3500;
-            await this.plugin.saveSettings();
-          }),
+        text.setValue(String(this.plugin.settings.preloadProjectsDelayMs || 0)).onChange(async (value) => {
+          const n = Number(value);
+          this.plugin.settings.preloadProjectsDelayMs = Number.isFinite(n) && n >= 0 ? n : 3500;
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)
       .setName('Task source marker')
-      .setDesc('Append source text to task description (e.g. Created by TickTick Flow Sync)')
+      .setDesc('Append source text to task description')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.addSourceMarker).onChange(async (value) => {
           this.plugin.settings.addSourceMarker = value;
           await this.plugin.saveSettings();
-          this.display();
         }),
       )
       .addText((text) =>
-        text
-          .setPlaceholder('Created by TickTick Flow Sync')
-          .setValue(this.plugin.settings.sourceMarkerText)
-          .onChange(async (value) => {
-            this.plugin.settings.sourceMarkerText = value || 'Created by TickTick Flow Sync';
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName('Run sync now')
-      .addButton((btn) =>
-        btn.setButtonText('Sync now').setCta().onClick(async () => {
-          try {
-            await this.plugin.syncNow();
-          } catch (e) {
-            new Notice(e instanceof Error ? e.message : String(e));
-          }
+        text.setValue(this.plugin.settings.sourceMarkerText).onChange(async (value) => {
+          this.plugin.settings.sourceMarkerText = value || 'Created by TickTick Flow Sync';
+          await this.plugin.saveSettings();
         }),
       );
 
-    containerEl.createEl('h3', { text: '3) Rules (what gets synced)' });
-    addRulesGuideBlock(containerEl);
-
-    containerEl.createEl('h4', { text: 'Add new rule' });
-
-    const addRuleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-add-rule-grid' });
-
-    const addBlank = new Setting(addRuleWrap)
-      .setName('Start from scratch')
-      .setDesc('Create an empty rule with sensible defaults you can edit')
-      .addButton((btn) =>
-        btn.setButtonText('+ Create blank rule').setClass('mod-cta').onClick(async () => {
-          await this.addBlankRule();
-        }),
-      );
-    addBlank.settingEl.addClass('ticktick-flow-add-rule-row');
-
-    const addDeadlines = new Setting(addRuleWrap)
-      .setName('Preset: Deadlines')
-      .setDesc('Due-date focused notes (generic). For full control, use + Create blank rule.')
-      .addButton((btn) =>
-        btn.setButtonText('+ Add Deadlines rule').onClick(async () => {
-          await this.addRuleFromPreset('deadlines');
-        }),
-      );
-    addDeadlines.settingEl.addClass('ticktick-flow-add-rule-row');
-
-    const addPersonal = new Setting(addRuleWrap)
-      .setName('Preset: Personal tasks')
-      .setDesc('Personal/home/admin style tasks')
-      .addButton((btn) =>
-        btn.setButtonText('+ Add Personal tasks rule').onClick(async () => {
-          await this.addRuleFromPreset('personal-tasks');
-        }),
-      );
-    addPersonal.settingEl.addClass('ticktick-flow-add-rule-row');
-
-    const addWork = new Setting(addRuleWrap)
-      .setName('Preset: Work items')
-      .setDesc('Work/project related tasks')
-      .addButton((btn) =>
-        btn.setButtonText('+ Add Work items rule').onClick(async () => {
-          await this.addRuleFromPreset('work-items');
-        }),
-      );
-    addWork.settingEl.addClass('ticktick-flow-add-rule-row');
-
-    const addCustom = new Setting(addRuleWrap)
-      .setName('Preset: Custom (selected below)')
-      .setDesc('Apply your selected saved custom preset')
-      .addButton((btn) =>
-        btn.setButtonText('+ Add selected custom preset').onClick(async () => {
-          await this.addRuleFromPreset('custom');
-        }),
-      );
-    addCustom.settingEl.addClass('ticktick-flow-add-rule-row');
-
-    addPresetGuideBlock(containerEl, this.plugin);
-
-    if (this.plugin.settings.customPresets.length > 0) {
-      new Setting(containerEl)
-        .setName('Selected custom preset for + Add selected custom preset')
-        .setDesc('Choose which saved custom preset is applied when clicking the add button')
-        .addDropdown((d) => {
-          const list = this.plugin.settings.customPresets;
-          if (!this.selectedCustomPresetId || !list.find((p) => p.id === this.selectedCustomPresetId)) {
-            this.selectedCustomPresetId = list[0].id;
-          }
-          list.forEach((p) => d.addOption(p.id, p.name));
-          d.setValue(this.selectedCustomPresetId).onChange((value) => {
-            this.selectedCustomPresetId = value;
-          });
-        });
-    }
-
-    if (this.plugin.settings.rules.length > 0) {
-      const presetManagerWrap = containerEl.createEl('div', { cls: 'ticktick-flow-preset-manager' });
-      presetManagerWrap.createEl('h4', { text: 'Custom presets' });
-      presetManagerWrap.createEl('p', { text: 'Save from an existing rule in one click. Edit rule first, then save it as a reusable preset.' });
-
-      this.plugin.settings.rules.forEach((rule) => {
-        const row = new Setting(presetManagerWrap)
-          .setName(`Save from: ${rule.name}`)
-          .setDesc('Create reusable preset from this rule')
-          .addButton((btn) =>
-            btn.setButtonText('Save as preset').onClick(async () => {
-              const suggested = `${rule.name} preset`;
-              const name = window.prompt('Preset name', suggested)?.trim();
-              if (!name) return;
-              const description = window.prompt('Preset description', `Custom preset from rule: ${rule.name}`)?.trim() || '';
-              await this.plugin.createCustomPresetFromRule(rule.id, name, description);
-              this.display();
-            }),
-          );
-        row.settingEl.addClass('ticktick-flow-add-rule-row');
-      });
-
-      if (this.plugin.settings.customPresets.length > 0) {
-        this.plugin.settings.customPresets.forEach((preset) => {
-          const row = new Setting(presetManagerWrap)
-            .setName(`Preset: ${preset.name}`)
-            .setDesc(preset.description || 'No description')
-            .addButton((btn) =>
-              btn.setButtonText('Delete').setWarning().onClick(async () => {
-                const ok = window.confirm(`Delete custom preset "${preset.name}"?`);
-                if (!ok) return;
-                await this.plugin.removeCustomPreset(preset.id);
-                if (this.selectedCustomPresetId === preset.id) this.selectedCustomPresetId = '';
-                this.display();
-              }),
-            );
-          row.settingEl.addClass('ticktick-flow-add-rule-row');
-        });
-      }
-    }
-
-
-    if (!this.plugin.settings.simpleMode) {
-      new Setting(containerEl)
-        .setName('Advanced mode')
-        .setDesc('Show low-level rule keys and extra controls')
-        .addToggle((toggle) =>
-          toggle.setValue(this.showAdvanced).onChange(async (value) => {
-            this.showAdvanced = value;
-            this.display();
-          }),
-        );
-    } else {
-      this.showAdvanced = false;
-    }
-
-    for (let i = 0; i < this.plugin.settings.rules.length; i += 1) {
-      const ruleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-rule' });
-      this.renderRule(ruleWrap, this.plugin.settings.rules[i], i);
-    }
-
-    containerEl.createEl('h3', { text: '4) Danger zone' });
+    containerEl.createEl('h3', { text: 'Danger zone' });
     new Setting(containerEl)
       .setName('Reset plugin settings to defaults')
       .setDesc('Clears current rules/presets and restores default settings')
@@ -1039,9 +1038,46 @@ Path: {{filePath}}`;
           this.projects = [];
           this.expandedRuleIds.clear();
           this.expansionInitialized = false;
-          this.selectedCustomPresetId = '';
           this.display();
         }),
       );
+  }
+
+  async display(): Promise<void> {
+    const { containerEl } = this;
+    containerEl.empty();
+    this.ensureRuleExpansionState();
+
+    containerEl.createEl('h2', { text: 'TickTick Flow Sync' });
+    containerEl.createEl('p', { text: 'Simple first. Pick a pane, get set up fast, customize later.' });
+
+    new Setting(containerEl)
+      .setName('Simple mode')
+      .setDesc('Beginner-first defaults and fewer visible controls')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.simpleMode).onChange(async (value) => {
+          this.plugin.settings.simpleMode = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
+
+    const paneBar = containerEl.createEl('div', { cls: 'ticktick-flow-pane-bar' });
+    const panes: Array<{ id: SettingsPane; label: string }> = [
+      { id: 'setup', label: 'Setup' },
+      { id: 'rules', label: 'Rules' },
+      { id: 'advanced', label: 'Advanced' },
+    ];
+    panes.forEach((pane) => {
+      const btn = paneBar.createEl('button', { text: pane.label, cls: this.activePane === pane.id ? 'mod-cta' : '' });
+      btn.addEventListener('click', () => {
+        this.activePane = pane.id;
+        this.display();
+      });
+    });
+
+    if (this.activePane === 'setup') this.renderSetupPane(containerEl);
+    else if (this.activePane === 'rules') this.renderRulesPane(containerEl);
+    else this.renderAdvancedPane(containerEl);
   }
 }

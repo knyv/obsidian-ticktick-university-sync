@@ -15,6 +15,21 @@ export interface CustomRulePreset {
   dueFields: string[];
   targetProjectName: string;
   syncMode: SyncMode;
+  requireDueDate?: boolean;
+
+  // optional full rule snapshot fields for better preset fidelity
+  markCompletedInTickTick?: boolean;
+  includeCompletedWithoutTaskId?: boolean;
+  candidateSelectionMode?: CandidateSelectionMode;
+  dueWindowMode?: DueWindowMode;
+  completedKeywords?: string[];
+  titleTemplate?: string;
+  contentTemplate?: string;
+  descTemplate?: string;
+  ticktickTagsField?: string;
+  tagSourceMode?: TagSourceMode;
+  statusField?: string;
+  classField?: string;
 }
 
 export interface SyncRule {
@@ -76,6 +91,7 @@ export interface TickTickUniversitySyncSettings {
   fallbackProjectName: string;
 
   syncOnStartup: boolean;
+  startupSyncDelayMs: number;
   autoSyncMinutes: number;
   dryRun: boolean;
 

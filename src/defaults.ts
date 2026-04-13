@@ -48,6 +48,7 @@ export const DEFAULT_SETTINGS: TickTickUniversitySyncSettings = {
   fallbackProjectName: 'University',
 
   syncOnStartup: false,
+  startupSyncDelayMs: 6000,
   autoSyncMinutes: 0,
   dryRun: false,
 
@@ -96,6 +97,17 @@ export const BUILTIN_PRESETS: CustomRulePreset[] = [
     dueFields: ['due', 'deadline'],
     targetProjectName: 'Work',
     syncMode: 'upsert',
+  },
+  {
+    id: 'general-tasks',
+    name: 'General tasks',
+    description: 'Task sync mode for notes without strict due-date requirement.',
+    tagsAny: ['tasks'],
+    excludeTagsAny: [],
+    dueFields: ['due', 'deadline'],
+    targetProjectName: 'Inbox',
+    syncMode: 'upsert',
+    requireDueDate: false,
   },
 ];
 
@@ -168,6 +180,9 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
   if (typeof merged.simpleMode !== 'boolean') merged.simpleMode = true;
   if (typeof merged.preloadProjectsOnStartup !== 'boolean') merged.preloadProjectsOnStartup = true;
   if (!Number.isFinite(merged.preloadProjectsDelayMs) || merged.preloadProjectsDelayMs < 0) merged.preloadProjectsDelayMs = 3500;
+  if (!Number.isFinite((merged as TickTickUniversitySyncSettings).startupSyncDelayMs) || (merged as TickTickUniversitySyncSettings).startupSyncDelayMs < 0) {
+    (merged as TickTickUniversitySyncSettings).startupSyncDelayMs = 6000;
+  }
   if (typeof merged.addSourceMarker !== 'boolean') merged.addSourceMarker = true;
   if (!merged.sourceMarkerText?.trim()) merged.sourceMarkerText = 'Created by TickTick Flow Sync';
   if (merged.localTrackingFile.trim() === '.obsidian/plugins/ticktick-university-sync/tracking.json') {

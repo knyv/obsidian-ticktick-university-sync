@@ -149,3 +149,33 @@
 .ticktick-flow-add-rule-row button {
   width: 100%;
 }
+
+.ticktick-flow-pane-bar {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 14px 0;
+}
+
+.ticktick-flow-pane-bar button {
+  min-width: 92px;
+}
+
+.ticktick-flow-preset-inline-editor {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 10px;
+  margin: 8px 0 12px 0;
+  background: var(--background-secondary);
+  display: grid;
+  gap: 8px;
+}
+
+.ticktick-flow-preset-inline-editor input {
+  width: 100%;
+}
+
+.ticktick-flow-preset-inline-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

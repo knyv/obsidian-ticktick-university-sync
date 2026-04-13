@@ -9,19 +9,18 @@ One-way sync: Obsidian is the source of truth.
 If this is your first setup, do this in order:
 
 1) Open plugin settings in Obsidian.
-2) In "Quick setup wizard", click "Open TickTick Developer Apps".
+2) In Setup pane, click "Open TickTick Developer Apps".
 3) Create or edit your TickTick app:
    - Redirect URI must be EXACTLY: `https://localhost/`
 4) Copy Client ID + Client Secret into plugin settings.
 5) Click "Open OAuth URL" and approve in browser.
 6) After redirect, copy the full URL from browser address bar.
-7) Back in plugin settings:
+7) Back in Setup pane:
    - click "Exchange from Clipboard" (fast path), or
-   - click "Exchange" and paste URL/code manually.
-8) Click "Test API connection".
-9) Click "Load project list".
-10) Add a rule and pick a target project from dropdown.
-11) Run `Dry run` first, then `Sync now`.
+   - click "Manual Exchange" and paste URL/code manually.
+8) Click "Load + test projects".
+9) Go to Rules pane, add a rule, and select target project.
+10) Run `Sync now`.
 
 ## OAuth notes (important)
 
@@ -49,9 +48,10 @@ Sync behavior:
 - `create_only`: only create new tasks
 
 Use one rule per context:
-- University
+- Deadlines
 - Work
 - Personal
+- General tasks (optional due date)
 
 ## Better TickTick formatting
 
@@ -102,7 +102,8 @@ Per-rule sync filters:
 - Due-date window: All due dates / Only already due (overdue) / Only upcoming
 
 Startup/performance UX:
-- Optional delayed project preload at startup (non-blocking)
+- Optional delayed project preload at startup (non-blocking + idle-time)
+- Optional delayed startup sync (runs only when already connected)
 - Simple mode on by default to keep settings light
 
 Task source marker:
@@ -151,6 +152,11 @@ Optional:
 - `YYYY-MM-DDTHH:mm`
 - `YYYY-MM-DDTHH:mm:ss`
 - optional TZ suffix: `Z`, `+HH:mm`, `+HHMM`
+
+Settings panes:
+- Setup: OAuth, connection test, project preload
+- Rules: add/edit rules, apply custom presets, save exact rule as preset
+- Advanced: sync automation, tracking mode, token mode, performance, reset
 
 ## Commands
 

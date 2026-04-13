@@ -16,6 +16,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   private client!: TickTickClient;
   private cachedProjects: { id: string; name: string; closed?: number }[] = [];
   private startupPreloadTimer: number | null = null;
+  private startupSyncTimer: number | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -106,7 +107,17 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       const delay = Math.max(0, this.settings.preloadProjectsDelayMs || 0);
       this.startupPreloadTimer = window.setTimeout(async () => {
         try {
-          await this.preloadProjects();
+          if (!this.settings.accessToken) return;
+          const run = async () => {
+            try {
+              await this.preloadProjects();
+            } catch {
+              // silent by design for startup performance
+            }
+          };
+          const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+          if (typeof ric === 'function') ric(() => { void run(); }, { timeout: 2500 });
+          else await run();
         } catch {
           // silent by design for startup performance
         }
@@ -114,9 +125,13 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     }
 
     if (this.settings.syncOnStartup) {
-      this.syncNow().catch((e) => {
-        console.error('[TickTick Flow Sync] Startup sync failed:', e);
-      });
+      const delay = Math.max(0, this.settings.startupSyncDelayMs || 0);
+      this.startupSyncTimer = window.setTimeout(() => {
+        if (!this.settings.accessToken) return;
+        this.syncNow().catch((e) => {
+          console.error('[TickTick Flow Sync] Startup sync failed:', e);
+        });
+      }, delay);
     }
   }
 
@@ -128,6 +143,10 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     if (this.startupPreloadTimer !== null) {
       window.clearTimeout(this.startupPreloadTimer);
       this.startupPreloadTimer = null;
+    }
+    if (this.startupSyncTimer !== null) {
+      window.clearTimeout(this.startupSyncTimer);
+      this.startupSyncTimer = null;
     }
   }
 
@@ -333,6 +352,19 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       dueFields: [...rule.dueFields],
       targetProjectName: rule.targetProjectName,
       syncMode: rule.syncMode,
+      requireDueDate: rule.requireDueDate,
+      markCompletedInTickTick: rule.markCompletedInTickTick,
+      includeCompletedWithoutTaskId: rule.includeCompletedWithoutTaskId,
+      candidateSelectionMode: rule.candidateSelectionMode,
+      dueWindowMode: rule.dueWindowMode,
+      completedKeywords: [...rule.completedKeywords],
+      titleTemplate: rule.titleTemplate,
+      contentTemplate: rule.contentTemplate,
+      descTemplate: rule.descTemplate,
+      ticktickTagsField: rule.ticktickTagsField,
+      tagSourceMode: rule.tagSourceMode,
+      statusField: rule.statusField,
+      classField: rule.classField,
     });
     await this.saveSettings();
     new Notice('Custom preset saved.');
