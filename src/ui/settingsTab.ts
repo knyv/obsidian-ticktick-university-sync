@@ -287,8 +287,17 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       rule.syncMode === 'upsert' ? 'upsert' : 'create-only',
     ];
 
-    const ready = rule.enabled && includeCount > 0 && hasProject;
-    const statusText = ready ? 'Ready to sync' : 'Needs setup';
+    const missingParts: string[] = [];
+    if (includeCount === 0) missingParts.push('include tags');
+    if (!hasProject) missingParts.push('target project');
+
+    const ready = rule.enabled && missingParts.length === 0;
+    const statusText = !rule.enabled ? 'Rule disabled' : ready ? 'Ready to sync' : 'Needs setup';
+    const statusDetail = !rule.enabled
+      ? 'Turn Enabled on to sync this rule.'
+      : ready
+        ? 'All required fields are set.'
+        : `Missing: ${missingParts.join(', ')}`;
 
     const collapseBtn = headerLeft.createEl('button', {
       text: isExpanded ? '▾' : '▸',
@@ -316,7 +325,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     enabledLabel.addClass(rule.enabled ? 'ticktick-flow-pill-enabled' : 'ticktick-flow-pill-disabled');
 
     const readinessLabel = headerRight.createEl('span', { text: statusText });
-    readinessLabel.addClass(ready ? 'ticktick-flow-pill-ready' : 'ticktick-flow-pill-needs-setup');
+    readinessLabel.addClass(!rule.enabled ? 'ticktick-flow-pill-disabled' : ready ? 'ticktick-flow-pill-ready' : 'ticktick-flow-pill-needs-setup');
 
     const enabledToggle = headerRight.createEl('input') as HTMLInputElement;
     enabledToggle.type = 'checkbox';
@@ -331,8 +340,9 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     if (!isExpanded) return;
 
     const quickStart = containerEl.createEl('div', { cls: 'ticktick-flow-rule-quickstart' });
+    quickStart.createEl('p', { text: `Status: ${statusDetail}` });
     quickStart.createEl('p', { text: 'Quick setup (recommended order): 1) Include tags  2) Target project  3) Sync mode  4) Rule actions' });
-    if (!hasProject) {
+    if (!hasProject && rule.enabled) {
       const fixRow = quickStart.createEl('div', { cls: 'ticktick-flow-rule-quickstart-actions' });
       const fixBtn = fixRow.createEl('button', { text: 'Fix this rule: load projects now' });
       fixBtn.classList.add('mod-cta');
@@ -912,7 +922,29 @@ Path: {{filePath}}`;
 
   private renderRulesPane(containerEl: HTMLElement) {
     containerEl.createEl('h3', { text: '2) Rules (what gets synced)' });
-    if (!this.plugin.settings.simpleMode) addRulesGuideBlock(containerEl);
+
+    if (this.plugin.settings.rules.length === 0) {
+      const empty = containerEl.createEl('div', { cls: 'ticktick-flow-empty-state' });
+      empty.createEl('h4', { text: 'No rules yet' });
+      empty.createEl('p', { text: 'Start with one rule, then customize later if needed.' });
+      const row = empty.createEl('div', { cls: 'ticktick-flow-empty-state-actions' });
+      const cta = row.createEl('button', { text: '+ Create first rule' });
+      cta.classList.add('mod-cta');
+      cta.addEventListener('click', async () => {
+        await this.addBlankRule();
+        this.activePane = 'rules';
+        this.display();
+      });
+
+      const presetBtn = row.createEl('button', { text: '+ Add Deadlines rule' });
+      presetBtn.addEventListener('click', async () => {
+        await this.addRuleFromPreset('deadlines');
+        this.activePane = 'rules';
+        this.display();
+      });
+    } else if (!this.plugin.settings.simpleMode) {
+      addRulesGuideBlock(containerEl);
+    }
 
     containerEl.createEl('h4', { text: 'Add new rule' });
     const addRuleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-add-rule-grid' });

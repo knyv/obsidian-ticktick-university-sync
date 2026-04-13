@@ -156,11 +156,13 @@ Optional:
 Settings panes:
 - Setup: OAuth, connection test, project preload
 - Rules: add/edit rules, apply custom presets, save exact rule as preset
-  - each rule now has inline quick summary + readiness chip (`Ready to sync` / `Needs setup`)
+  - each rule now has inline quick summary + readiness chip (`Ready to sync` / `Needs setup` / `Rule disabled`)
+  - each rule shows explicit missing-state text in quick setup (`Missing: include tags`, `Missing: target project`)
   - each rule includes a `Fix this rule` quick action when project is missing
   - matching details are collapsed by default in simple mode (`Matching` button)
   - formatting controls are collapsed by default in simple mode (`Formatting` button)
   - advanced per-rule options are hidden behind `Advanced` button in `Rule actions`
+  - no-rules state now has guided CTAs (`+ Create first rule`, `+ Add Deadlines rule`)
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
 ## Commands

@@ -221,6 +221,34 @@
   font-size: 12px;
 }
 
+.ticktick-flow-rule-quickstart p + p {
+  margin-top: 6px;
+}
+
 .ticktick-flow-rule-quickstart-actions {
   margin-top: 8px;
+}
+
+.ticktick-flow-empty-state {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 8px 0 12px 0;
+  background: var(--background-secondary);
+}
+
+.ticktick-flow-empty-state h4 {
+  margin: 0 0 6px 0;
+}
+
+.ticktick-flow-empty-state p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.ticktick-flow-empty-state-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
