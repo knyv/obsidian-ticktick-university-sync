@@ -142,6 +142,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   private presetRuleIndexInput = '';
   private presetNameInput = '';
   private presetDescriptionInput = '';
+  private selectedCustomPresetId = '';
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
@@ -152,7 +153,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     let rule: SyncRule;
 
     if (preset === 'custom') {
-      const custom = this.plugin.settings.customPresets[0];
+      const list = this.plugin.settings.customPresets;
+      const custom =
+        list.find((p) => p.id === this.selectedCustomPresetId) ??
+        list[0];
       if (!custom) {
         new Notice('No custom presets yet. Save one first.');
         return;
@@ -734,6 +738,22 @@ Rule: {{ruleName}}`;
       );
 
     addPresetGuideBlock(containerEl, this.plugin);
+
+    if (this.plugin.settings.customPresets.length > 0) {
+      new Setting(containerEl)
+        .setName('Select custom preset for "First custom preset" button')
+        .setDesc('Choose which saved custom preset is applied when clicking the button')
+        .addDropdown((d) => {
+          const list = this.plugin.settings.customPresets;
+          if (!this.selectedCustomPresetId || !list.find((p) => p.id === this.selectedCustomPresetId)) {
+            this.selectedCustomPresetId = list[0].id;
+          }
+          list.forEach((p) => d.addOption(p.id, p.name));
+          d.setValue(this.selectedCustomPresetId).onChange((value) => {
+            this.selectedCustomPresetId = value;
+          });
+        });
+    }
 
     if (this.plugin.settings.rules.length > 0) {
       new Setting(containerEl)
