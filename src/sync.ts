@@ -432,11 +432,6 @@ export async function runSync(
         continue;
       }
 
-      if (completed && !effectiveTaskId && !candidate.rule.includeCompletedWithoutTaskId) {
-        summary.skippedCompletedNoTask += 1;
-        continue;
-      }
-
       let verifiedTaskId = effectiveTaskId;
       let verifiedProjectId = effectiveProjectId;
       if (effectiveTaskId && effectiveProjectId) {
@@ -467,6 +462,11 @@ export async function runSync(
         } catch {
           // heuristic lookup is best-effort only
         }
+      }
+
+      if (completed && !verifiedTaskId && !candidate.rule.includeCompletedWithoutTaskId) {
+        summary.skippedCompletedNoTask += 1;
+        continue;
       }
 
       const payload = buildTaskPayload(
