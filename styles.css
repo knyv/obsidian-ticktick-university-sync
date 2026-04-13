@@ -216,6 +216,12 @@
   letter-spacing: 0.04em;
 }
 
+.ticktick-flow-section-note {
+  margin: 0 0 8px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .ticktick-flow-rule-quickstart p {
   margin: 0;
   font-size: 12px;

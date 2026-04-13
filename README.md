@@ -169,16 +169,20 @@ Formatting behavior update:
 - `contentTemplate` is now the primary recommended field for task details/links
 - `descTemplate` is treated as legacy/optional (hidden in simple mode unless advanced is open)
 
+Obsidian rule matching tags vs TickTick task tags:
+- `Obsidian include tags` and `Exclude tags` are MATCHING ONLY (which notes are selected).
+- They are not automatically copied as TickTick task tags.
+
 TickTick tags mapping:
 - Source options:
-  - note tags (`all_note_tags`) OR include-tags (`include_tags`)
-  - optional frontmatter tags field (`ticktick_tags`)
+  - Obsidian note tags (`all_note_tags`) OR none (`none`)
+  - optional frontmatter TickTick tags field (`ticktick_tags`)
 - Rule tag options:
   - fixed per-rule TickTick tags (`Fixed TickTick tags`)
   - `Suggest` button (best-effort) pulls known tags from current TickTick tasks and appends up to 8 unseen tags
 - Assignment mode per rule:
   - `merge` (default): combine note/frontmatter tags + fixed rule tags
-  - `rule_only`: ignore note/frontmatter tags and assign only fixed rule tags
+  - `rule_only`: assign only fixed rule tags
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
 ## Commands

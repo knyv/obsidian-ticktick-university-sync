@@ -99,8 +99,12 @@ export async function collectCandidates(app: App, settings: TickTickUniversitySy
 }
 
 function collectTickTickTags(candidate: SyncCandidate): string[] {
-  const source = candidate.rule.tagSourceMode === 'include_tags' ? candidate.rule.tagsAny : candidate.tags;
-  const fromSource = source.map(normalizeTag).filter(Boolean);
+  // Obsidian note tags from frontmatter are the only dynamic source.
+  // Rule include-tags are for matching only and are not copied as TickTick tags.
+  const fromObsidianNote =
+    candidate.rule.tagSourceMode === 'all_note_tags'
+      ? candidate.tags.map(normalizeTag).filter(Boolean)
+      : [];
 
   const extra = toStringArray(candidate.frontmatter[candidate.rule.ticktickTagsField || 'ticktick_tags'])
     .map(normalizeTag)
@@ -112,7 +116,7 @@ function collectTickTickTags(candidate: SyncCandidate): string[] {
     return Array.from(new Set(fixed));
   }
 
-  const merged = Array.from(new Set([...fromSource, ...extra, ...fixed]));
+  const merged = Array.from(new Set([...fromObsidianNote, ...extra, ...fixed]));
   return merged;
 }
 

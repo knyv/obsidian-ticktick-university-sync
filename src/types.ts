@@ -2,7 +2,8 @@ import { TFile } from 'obsidian';
 
 export type SyncMode = 'upsert' | 'create_only';
 export type TrackingMode = 'frontmatter' | 'local_json';
-export type TagSourceMode = 'all_note_tags' | 'include_tags';
+// include_tags kept for legacy migration compatibility; UI now uses 'none' instead.
+export type TagSourceMode = 'all_note_tags' | 'none' | 'include_tags';
 export type TickTickTagAssignmentMode = 'merge' | 'rule_only';
 export type CandidateSelectionMode = 'all' | 'new_only' | 'existing_only';
 export type DueWindowMode = 'all' | 'overdue_only' | 'not_overdue_only';

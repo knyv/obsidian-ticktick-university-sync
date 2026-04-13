@@ -165,7 +165,7 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
     ticktickTagsField: typeof rule.ticktickTagsField === 'string' && rule.ticktickTagsField.trim()
       ? rule.ticktickTagsField
       : 'ticktick_tags',
-    tagSourceMode: rule.tagSourceMode === 'include_tags' ? 'include_tags' : 'all_note_tags',
+    tagSourceMode: rule.tagSourceMode === 'all_note_tags' ? 'all_note_tags' : 'none',
     fixedTickTickTags: Array.isArray(rule.fixedTickTickTags)
       ? rule.fixedTickTickTags.map((x) => String(x).trim()).filter(Boolean)
       : [],

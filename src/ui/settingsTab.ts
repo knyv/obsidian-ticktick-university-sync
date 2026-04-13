@@ -74,10 +74,10 @@ function addRulesGuideBlock(containerEl: HTMLElement): void {
   const block = addInfoBlock(containerEl, 'How rules work');
   const ul = block.createEl('ul');
   [
-    'A note matches when it has ANY include tag and NONE of the exclude tags.',
+    'Obsidian include/exclude tags are MATCHING ONLY (which notes the rule targets).',
+    'TickTick task tags are configured separately in the TickTick tags section.',
     'Due date uses the first non-empty key in Due fields list (left to right).',
     'Use one rule per context: Deadlines, Work items, Personal tasks, or General tasks.',
-    'Each rule is grouped into: Match notes -> Project target -> Sync behavior -> Task formatting.',
     'Project target must be explicitly selected for each enabled rule.',
     'Start with Dry run before real sync.',
   ].forEach((line) => ul.createEl('li', { text: line }));
@@ -230,7 +230,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       contentTemplate: preset.contentTemplate || '',
       descTemplate: preset.descTemplate || '',
       ticktickTagsField: preset.ticktickTagsField || 'ticktick_tags',
-      tagSourceMode: preset.tagSourceMode === 'include_tags' ? 'include_tags' : 'all_note_tags',
+      tagSourceMode: preset.tagSourceMode === 'all_note_tags' ? 'all_note_tags' : 'none',
       fixedTickTickTags: Array.isArray(preset.fixedTickTickTags) ? [...preset.fixedTickTickTags] : [],
       ticktickTagAssignmentMode: preset.ticktickTagAssignmentMode === 'rule_only' ? 'rule_only' : 'merge',
       statusField: preset.statusField || 'status',
@@ -343,7 +343,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     const quickStart = containerEl.createEl('div', { cls: 'ticktick-flow-rule-quickstart' });
     quickStart.createEl('p', { text: `Status: ${statusDetail}` });
-    quickStart.createEl('p', { text: 'Quick setup (recommended order): 1) Include tags  2) Target project  3) Sync mode  4) Rule actions' });
+    quickStart.createEl('p', { text: 'Quick setup (recommended order): 1) Obsidian include tags  2) Target project  3) Sync mode  4) TickTick tags (optional)' });
     if (!hasProject && rule.enabled) {
       const fixRow = quickStart.createEl('div', { cls: 'ticktick-flow-rule-quickstart-actions' });
       const fixBtn = fixRow.createEl('button', { text: 'Fix this rule: load projects now' });
@@ -374,8 +374,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Include tags')
-      .setDesc('Comma-separated. Note must contain at least one of these tags.')
+      .setName('Obsidian include tags (match only)')
+      .setDesc('Comma-separated Obsidian note tags. Rule matches when note has at least one of these.')
       .addText((text) => {
         text.setPlaceholder('university/assignments, university/exams').setValue(listToCsv(rule.tagsAny));
         let debounceTimer: number | null = null;
@@ -518,7 +518,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    containerEl.createEl('h5', { text: 'D) Task formatting' });
+    containerEl.createEl('h5', { text: 'D) TickTick task content' });
     const showFormatting = this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode;
 
     new Setting(containerEl)
@@ -588,9 +588,12 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           );
       }
 
+      containerEl.createEl('h5', { text: 'E) TickTick tags' });
+      containerEl.createEl('p', { text: 'This section controls TickTick task tags. It is separate from Obsidian include/exclude rule matching.', cls: 'ticktick-flow-section-note' });
+
       new Setting(containerEl)
-        .setName('TickTick tags field (optional)')
-        .setDesc('Frontmatter property containing tags to add in TickTick (comma list or YAML array).')
+        .setName('TickTick tags from note property (optional)')
+        .setDesc('Frontmatter property containing TickTick tags (comma list or YAML array). Example: ticktick_tags')
         .addText((text) =>
           text
             .setPlaceholder('ticktick_tags')
@@ -603,14 +606,14 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName('TickTick tags source')
-        .setDesc('Choose whether tags come from note metadata or only from this rule')
+        .setDesc('Choose where TickTick tags are pulled from (never uses Obsidian include/exclude matching tags)')
         .addDropdown((d) =>
           d
-            .addOption('all_note_tags', 'All note tags')
-            .addOption('include_tags', 'Only include-tags from this rule')
-            .setValue(rule.tagSourceMode || 'all_note_tags')
+            .addOption('all_note_tags', 'Obsidian note tags')
+            .addOption('none', 'None (disable note-tag copy)')
+            .setValue(rule.tagSourceMode === 'all_note_tags' ? 'all_note_tags' : 'none')
             .onChange(async (value) => {
-              rule.tagSourceMode = value === 'include_tags' ? 'include_tags' : 'all_note_tags';
+              rule.tagSourceMode = value === 'all_note_tags' ? 'all_note_tags' : 'none';
               await this.plugin.saveSettings();
             }),
         )
@@ -1113,9 +1116,16 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   private renderAdvancedPane(containerEl: HTMLElement) {
     containerEl.createEl('h3', { text: '3) Advanced & performance' });
 
-    if (this.plugin.settings.simpleMode) {
-      containerEl.createEl('p', { text: 'Simple mode is ON. These controls are optional; change only if needed.' });
-    }
+    new Setting(containerEl)
+      .setName('Simple mode')
+      .setDesc('Beginner-first defaults and fewer visible controls in Rules pane')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.simpleMode).onChange(async (value) => {
+          this.plugin.settings.simpleMode = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
 
     new Setting(containerEl)
       .setName('Sync on startup')
@@ -1260,17 +1270,6 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           } catch (e) {
             new Notice(e instanceof Error ? e.message : String(e));
           }
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('Simple mode')
-      .setDesc('Beginner-first defaults and fewer visible controls')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.simpleMode).onChange(async (value) => {
-          this.plugin.settings.simpleMode = value;
-          await this.plugin.saveSettings();
-          this.display();
         }),
       );
 
