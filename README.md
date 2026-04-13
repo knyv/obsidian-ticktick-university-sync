@@ -198,7 +198,7 @@ Tracking/update behavior:
 
 Status sync behavior:
 - Completed-note creation behavior:
-  - `Create completed tasks when missing in TickTick` is ON by default.
+  - `Create completed tasks when missing in TickTick` is OFF by default.
   - If OFF, completed notes without an existing task link are skipped.
 
 - Rule setting `Status sync mode` supports direction modes:

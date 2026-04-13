@@ -17,7 +17,7 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     syncedAtField: 'ticktick_synced_at',
     targetProjectId: '',
     targetProjectName: 'University',
-    includeCompletedWithoutTaskId: true,
+    includeCompletedWithoutTaskId: false,
     markCompletedInTickTick: true,
     syncMode: 'upsert',
     taskStatusSyncMode: 'off',
