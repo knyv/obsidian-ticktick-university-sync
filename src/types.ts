@@ -43,6 +43,7 @@ export interface SyncRule {
   includeCompletedWithoutTaskId: boolean;
   markCompletedInTickTick: boolean;
   syncMode: SyncMode;
+  requireDueDate?: boolean;
   candidateSelectionMode?: CandidateSelectionMode;
   dueWindowMode?: DueWindowMode;
   completedKeywords: string[];
@@ -82,6 +83,15 @@ export interface TickTickUniversitySyncSettings {
   localTrackingFile: string;
   allowAllPropertyTokens: boolean;
   customPresets: CustomRulePreset[];
+
+  // startup / UX
+  simpleMode: boolean;
+  preloadProjectsOnStartup: boolean;
+  preloadProjectsDelayMs: number;
+
+  // optional source marker
+  addSourceMarker: boolean;
+  sourceMarkerText: string;
 
   rules: SyncRule[];
 }

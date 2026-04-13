@@ -146,9 +146,6 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   plugin: PluginApi;
   private projects: TickTickProject[] = [];
   private showAdvanced = false;
-  private presetRuleIndexInput = '';
-  private presetNameInput = '';
-  private presetDescriptionInput = '';
   private selectedCustomPresetId = '';
   private expandedRuleIds = new Set<string>();
   private expansionInitialized = false;
@@ -369,35 +366,47 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           }),
       );
 
-    new Setting(containerEl)
-      .setName('Which tasks to sync')
-      .setDesc('All, only new (not tracked yet), or only existing (already tracked)')
-      .addDropdown((d) =>
-        d
-          .addOption('all', 'All')
-          .addOption('new_only', 'Only new')
-          .addOption('existing_only', 'Only existing')
-          .setValue(rule.candidateSelectionMode || 'all')
-          .onChange(async (value) => {
-            rule.candidateSelectionMode = value === 'new_only' || value === 'existing_only' ? value : 'all';
+    if (!this.plugin.settings.simpleMode || this.showAdvanced) {
+      new Setting(containerEl)
+        .setName('Require due date')
+        .setDesc('If off, notes without due can still sync (general tasks mode).')
+        .addToggle((toggle) =>
+          toggle.setValue(rule.requireDueDate !== false).onChange(async (value) => {
+            rule.requireDueDate = value;
             await this.plugin.saveSettings();
           }),
-      );
+        );
 
-    new Setting(containerEl)
-      .setName('Due-date window')
-      .setDesc('Choose whether to sync overdue only, not-overdue only, or both')
-      .addDropdown((d) =>
-        d
-          .addOption('all', 'All due dates')
-          .addOption('overdue_only', 'Only already due (overdue)')
-          .addOption('not_overdue_only', 'Only upcoming/not overdue')
-          .setValue(rule.dueWindowMode || 'all')
-          .onChange(async (value) => {
-            rule.dueWindowMode = value === 'overdue_only' || value === 'not_overdue_only' ? value : 'all';
-            await this.plugin.saveSettings();
-          }),
-      );
+      new Setting(containerEl)
+        .setName('Which tasks to sync')
+        .setDesc('All, only new (not tracked yet), or only existing (already tracked)')
+        .addDropdown((d) =>
+          d
+            .addOption('all', 'All')
+            .addOption('new_only', 'Only new')
+            .addOption('existing_only', 'Only existing')
+            .setValue(rule.candidateSelectionMode || 'all')
+            .onChange(async (value) => {
+              rule.candidateSelectionMode = value === 'new_only' || value === 'existing_only' ? value : 'all';
+              await this.plugin.saveSettings();
+            }),
+        );
+
+      new Setting(containerEl)
+        .setName('Due-date window')
+        .setDesc('Choose whether to sync overdue only, not-overdue only, or both')
+        .addDropdown((d) =>
+          d
+            .addOption('all', 'All due dates')
+            .addOption('overdue_only', 'Only already due (overdue)')
+            .addOption('not_overdue_only', 'Only upcoming/not overdue')
+            .setValue(rule.dueWindowMode || 'all')
+            .onChange(async (value) => {
+              rule.dueWindowMode = value === 'overdue_only' || value === 'not_overdue_only' ? value : 'all';
+              await this.plugin.saveSettings();
+            }),
+        );
+    }
 
     new Setting(containerEl)
       .setName('Completion behavior')
@@ -707,6 +716,17 @@ Path: {{filePath}}`;
       .settingEl.addClass('ticktick-flow-action-row');
 
     new Setting(containerEl)
+      .setName('Simple mode')
+      .setDesc('Show beginner-focused settings first; hide extra complexity')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.simpleMode).onChange(async (value) => {
+          this.plugin.settings.simpleMode = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
+
+    new Setting(containerEl)
       .setName('Connection & projects')
       .setDesc('Recommended: click "Load + test projects" first, then choose project per enabled rule')
       .addButton((btn) =>
@@ -819,6 +839,47 @@ Path: {{filePath}}`;
       );
 
     new Setting(containerEl)
+      .setName('Startup project preload')
+      .setDesc('Load project list automatically after startup (non-blocking)')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.preloadProjectsOnStartup).onChange(async (value) => {
+          this.plugin.settings.preloadProjectsOnStartup = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('delay ms (e.g. 3500)')
+          .setValue(String(this.plugin.settings.preloadProjectsDelayMs || 0))
+          .onChange(async (value) => {
+            const n = Number(value);
+            this.plugin.settings.preloadProjectsDelayMs = Number.isFinite(n) && n >= 0 ? n : 3500;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName('Task source marker')
+      .setDesc('Append source text to task description (e.g. Created by TickTick Flow Sync)')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.addSourceMarker).onChange(async (value) => {
+          this.plugin.settings.addSourceMarker = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('Created by TickTick Flow Sync')
+          .setValue(this.plugin.settings.sourceMarkerText)
+          .onChange(async (value) => {
+            this.plugin.settings.sourceMarkerText = value || 'Created by TickTick Flow Sync';
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
       .setName('Run sync now')
       .addButton((btn) =>
         btn.setButtonText('Sync now').setCta().onClick(async () => {
@@ -849,7 +910,7 @@ Path: {{filePath}}`;
 
     const addDeadlines = new Setting(addRuleWrap)
       .setName('Preset: Deadlines')
-      .setDesc('Due-date focused notes (generic)')
+      .setDesc('Due-date focused notes (generic). For full control, use + Create blank rule.')
       .addButton((btn) =>
         btn.setButtonText('+ Add Deadlines rule').onClick(async () => {
           await this.addRuleFromPreset('deadlines');
@@ -891,8 +952,8 @@ Path: {{filePath}}`;
 
     if (this.plugin.settings.customPresets.length > 0) {
       new Setting(containerEl)
-        .setName('Select custom preset for "First custom preset" button')
-        .setDesc('Choose which saved custom preset is applied when clicking the button')
+        .setName('Selected custom preset for + Add selected custom preset')
+        .setDesc('Choose which saved custom preset is applied when clicking the add button')
         .addDropdown((d) => {
           const list = this.plugin.settings.customPresets;
           if (!this.selectedCustomPresetId || !list.find((p) => p.id === this.selectedCustomPresetId)) {
@@ -906,64 +967,60 @@ Path: {{filePath}}`;
     }
 
     if (this.plugin.settings.rules.length > 0) {
-      new Setting(containerEl)
-        .setName('Save current rule as custom preset')
-        .setDesc('Pick a rule by index, then save reusable preset settings')
-        .addText((text) =>
-          text
-            .setPlaceholder(`rule index, 1-${this.plugin.settings.rules.length}`)
-            .setValue(this.presetRuleIndexInput)
-            .onChange((value) => {
-              this.presetRuleIndexInput = value;
-            }),
-        )
-        .addText((text) =>
-          text
-            .setPlaceholder('preset name')
-            .setValue(this.presetNameInput)
-            .onChange((value) => {
-              this.presetNameInput = value;
-            }),
-        )
-        .addText((text) =>
-          text
-            .setPlaceholder('preset description')
-            .setValue(this.presetDescriptionInput)
-            .onChange((value) => {
-              this.presetDescriptionInput = value;
-            }),
-        )
-        .addButton((btn) =>
-          btn.setButtonText('Save preset').onClick(async () => {
-            const idxRaw = this.presetRuleIndexInput.trim() || '1';
-            const name = this.presetNameInput.trim() || 'Custom preset';
-            const description = this.presetDescriptionInput.trim() || 'Custom preset from current rule';
+      const presetManagerWrap = containerEl.createEl('div', { cls: 'ticktick-flow-preset-manager' });
+      presetManagerWrap.createEl('h4', { text: 'Custom presets' });
+      presetManagerWrap.createEl('p', { text: 'Save from an existing rule in one click. Edit rule first, then save it as a reusable preset.' });
 
-            const idx = Number(idxRaw) - 1;
-            if (!Number.isFinite(idx) || idx < 0 || idx >= this.plugin.settings.rules.length) {
-              new Notice(`Invalid rule index. Use 1-${this.plugin.settings.rules.length}.`);
-              return;
-            }
+      this.plugin.settings.rules.forEach((rule) => {
+        const row = new Setting(presetManagerWrap)
+          .setName(`Save from: ${rule.name}`)
+          .setDesc('Create reusable preset from this rule')
+          .addButton((btn) =>
+            btn.setButtonText('Save as preset').onClick(async () => {
+              const suggested = `${rule.name} preset`;
+              const name = window.prompt('Preset name', suggested)?.trim();
+              if (!name) return;
+              const description = window.prompt('Preset description', `Custom preset from rule: ${rule.name}`)?.trim() || '';
+              await this.plugin.createCustomPresetFromRule(rule.id, name, description);
+              this.display();
+            }),
+          );
+        row.settingEl.addClass('ticktick-flow-add-rule-row');
+      });
 
-            await this.plugin.createCustomPresetFromRule(this.plugin.settings.rules[idx].id, name, description);
-            this.presetRuleIndexInput = '';
-            this.presetNameInput = '';
-            this.presetDescriptionInput = '';
-            this.display();
-          }),
-        );
+      if (this.plugin.settings.customPresets.length > 0) {
+        this.plugin.settings.customPresets.forEach((preset) => {
+          const row = new Setting(presetManagerWrap)
+            .setName(`Preset: ${preset.name}`)
+            .setDesc(preset.description || 'No description')
+            .addButton((btn) =>
+              btn.setButtonText('Delete').setWarning().onClick(async () => {
+                const ok = window.confirm(`Delete custom preset "${preset.name}"?`);
+                if (!ok) return;
+                await this.plugin.removeCustomPreset(preset.id);
+                if (this.selectedCustomPresetId === preset.id) this.selectedCustomPresetId = '';
+                this.display();
+              }),
+            );
+          row.settingEl.addClass('ticktick-flow-add-rule-row');
+        });
+      }
     }
 
 
-    new Setting(containerEl)
-      .setName('Advanced mode')
-      .setDesc('Show low-level rule keys and extra controls')
-      .addToggle((toggle) =>
-        toggle.setValue(this.showAdvanced).onChange(async (value) => {
-          this.showAdvanced = value;
-          this.display();
-        }),
-      );
+    if (!this.plugin.settings.simpleMode) {
+      new Setting(containerEl)
+        .setName('Advanced mode')
+        .setDesc('Show low-level rule keys and extra controls')
+        .addToggle((toggle) =>
+          toggle.setValue(this.showAdvanced).onChange(async (value) => {
+            this.showAdvanced = value;
+            this.display();
+          }),
+        );
+    } else {
+      this.showAdvanced = false;
+    }
 
     for (let i = 0; i < this.plugin.settings.rules.length; i += 1) {
       const ruleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-rule' });
@@ -982,9 +1039,6 @@ Path: {{filePath}}`;
           this.projects = [];
           this.expandedRuleIds.clear();
           this.expansionInitialized = false;
-          this.presetRuleIndexInput = '';
-          this.presetNameInput = '';
-          this.presetDescriptionInput = '';
           this.selectedCustomPresetId = '';
           this.display();
         }),

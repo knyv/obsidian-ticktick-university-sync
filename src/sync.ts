@@ -74,7 +74,7 @@ export async function collectCandidates(app: App, settings: TickTickUniversitySy
       if (!matchesRule(tags, rule)) continue;
 
       const dueRaw = firstNonEmptyField(fm, rule.dueFields);
-      if (!dueRaw) continue;
+      if (!dueRaw && rule.requireDueDate !== false) continue;
 
       const classNames = toStringArray(fm[rule.classField]);
       const statusRaw = fm[rule.statusField];
@@ -85,7 +85,7 @@ export async function collectCandidates(app: App, settings: TickTickUniversitySy
         file,
         frontmatter: fm,
         rule,
-        dueRaw,
+        dueRaw: dueRaw || '',
         tags,
         classNames,
         statusRaw,
@@ -131,7 +131,8 @@ function buildTaskPayload(
   projectName: string,
   existingId?: string,
 ): TickTickTaskPayload {
-  const due = parseDueToTickTick(candidate.dueRaw);
+  const hasDue = Boolean(candidate.dueRaw?.trim());
+  const due = hasDue ? parseDueToTickTick(candidate.dueRaw) : undefined;
   const classText = candidate.classNames.length ? candidate.classNames.join(', ') : '(not set)';
   const noteLink = getObsidianDeepLink(app, candidate.file);
   const noteMdLink = getObsidianMarkdownLink(app, candidate.file);
@@ -179,17 +180,20 @@ function buildTaskPayload(
     .replace(/\\n/g, '\n')
     .trim();
 
+  const sourceMarker = settings.addSourceMarker ? settings.sourceMarkerText.trim() : '';
+  const mergedDesc = [desc, sourceMarker].filter(Boolean).join('\n\n');
+
   return {
     id: existingId,
     projectId,
     title: title || candidate.file.basename,
     content,
-    desc: desc || undefined,
+    desc: mergedDesc || undefined,
     tags: ticktickTags.length ? ticktickTags : undefined,
-    isAllDay: due.isAllDay,
-    startDate: due.startDate,
-    dueDate: due.dueDate,
-    timeZone: due.timeZone,
+    isAllDay: due?.isAllDay,
+    startDate: due?.startDate,
+    dueDate: due?.dueDate,
+    timeZone: due?.timeZone,
     status: isCompletedStatus(candidate.statusRaw, candidate.rule.completedKeywords) ? 2 : 0,
   };
 }

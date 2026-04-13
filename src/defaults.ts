@@ -20,6 +20,7 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     includeCompletedWithoutTaskId: false,
     markCompletedInTickTick: true,
     syncMode: 'upsert',
+    requireDueDate: true,
     candidateSelectionMode: 'all',
     dueWindowMode: 'all',
     completedKeywords: ['completed', 'complete', 'done', 'finished'],
@@ -54,6 +55,13 @@ export const DEFAULT_SETTINGS: TickTickUniversitySyncSettings = {
   localTrackingFile: '.obsidian/plugins/ticktick-flow-sync/tracking.json',
   allowAllPropertyTokens: true,
   customPresets: [],
+
+  simpleMode: true,
+  preloadProjectsOnStartup: true,
+  preloadProjectsDelayMs: 3500,
+
+  addSourceMarker: true,
+  sourceMarkerText: 'Created by TickTick Flow Sync',
 
   rules: [makeUniversityRule()],
 };
@@ -132,6 +140,7 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       Array.isArray(rule.completedKeywords) && rule.completedKeywords.length
         ? rule.completedKeywords
         : ['completed', 'complete', 'done', 'finished'],
+    requireDueDate: typeof rule.requireDueDate === 'boolean' ? rule.requireDueDate : true,
     candidateSelectionMode:
       rule.candidateSelectionMode === 'new_only' || rule.candidateSelectionMode === 'existing_only'
         ? rule.candidateSelectionMode
@@ -156,6 +165,11 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
   if (!Array.isArray(merged.customPresets)) {
     merged.customPresets = [];
   }
+  if (typeof merged.simpleMode !== 'boolean') merged.simpleMode = true;
+  if (typeof merged.preloadProjectsOnStartup !== 'boolean') merged.preloadProjectsOnStartup = true;
+  if (!Number.isFinite(merged.preloadProjectsDelayMs) || merged.preloadProjectsDelayMs < 0) merged.preloadProjectsDelayMs = 3500;
+  if (typeof merged.addSourceMarker !== 'boolean') merged.addSourceMarker = true;
+  if (!merged.sourceMarkerText?.trim()) merged.sourceMarkerText = 'Created by TickTick Flow Sync';
   if (merged.localTrackingFile.trim() === '.obsidian/plugins/ticktick-university-sync/tracking.json') {
     merged.localTrackingFile = '.obsidian/plugins/ticktick-flow-sync/tracking.json';
   }

@@ -36,7 +36,9 @@ If this is your first setup, do this in order:
 A note is synced by a rule when:
 - it has ANY tag in `Include tags`, and
 - it has NONE of the tags in `Exclude tags`, and
-- at least one due field in `Due fields` is non-empty.
+- due field requirement is satisfied:
+  - default: requires at least one non-empty due property
+  - optional advanced mode: disable due requirement for general task sync
 
 Due field behavior:
 - `Due fields` is ordered fallback, e.g. `due, deadline, exam_date`
@@ -99,6 +101,13 @@ Per-rule sync filters:
 - Which tasks to sync: All / Only new / Only existing
 - Due-date window: All due dates / Only already due (overdue) / Only upcoming
 
+Startup/performance UX:
+- Optional delayed project preload at startup (non-blocking)
+- Simple mode on by default to keep settings light
+
+Task source marker:
+- Optional marker appended to task description (default: "Created by TickTick Flow Sync")
+
 ## Tracking mode (note metadata vs local file)
 
 Choose in settings:
@@ -152,4 +161,4 @@ Optional:
 - Beginner path: exchange auth code/URL (manual alt)
 - Connection check: test TickTick API
 - Projects: load TickTick project list
-- Projects: auto-select target project for first rule
+- Projects: validate and refresh selected target projects

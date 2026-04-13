@@ -15,6 +15,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   private syncTimer: number | null = null;
   private client!: TickTickClient;
   private cachedProjects: { id: string; name: string; closed?: number }[] = [];
+  private startupPreloadTimer: number | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -101,6 +102,17 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.setupAutoSync();
 
+    if (this.settings.preloadProjectsOnStartup) {
+      const delay = Math.max(0, this.settings.preloadProjectsDelayMs || 0);
+      this.startupPreloadTimer = window.setTimeout(async () => {
+        try {
+          await this.preloadProjects();
+        } catch {
+          // silent by design for startup performance
+        }
+      }, delay);
+    }
+
     if (this.settings.syncOnStartup) {
       this.syncNow().catch((e) => {
         console.error('[TickTick Flow Sync] Startup sync failed:', e);
@@ -112,6 +124,10 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     if (this.syncTimer !== null) {
       window.clearInterval(this.syncTimer);
       this.syncTimer = null;
+    }
+    if (this.startupPreloadTimer !== null) {
+      window.clearTimeout(this.startupPreloadTimer);
+      this.startupPreloadTimer = null;
     }
   }
 
@@ -233,7 +249,9 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   async preloadProjects() {
     const projects = await this.client.listProjects();
     this.cachedProjects = projects;
-    new Notice(`Loaded ${projects.length} TickTick projects.`);
+    if (!this.settings.simpleMode) {
+      new Notice(`Loaded ${projects.length} TickTick projects.`);
+    }
   }
 
   async discoverAndSelectProject(ruleId?: string) {
@@ -318,6 +336,15 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
     await this.saveSettings();
     new Notice('Custom preset saved.');
+  }
+
+  async removeCustomPreset(presetId: string) {
+    const before = this.settings.customPresets.length;
+    this.settings.customPresets = this.settings.customPresets.filter((p) => p.id !== presetId);
+    if (this.settings.customPresets.length !== before) {
+      await this.saveSettings();
+      new Notice('Custom preset removed.');
+    }
   }
 
   async resetSettingsToDefault() {
