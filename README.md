@@ -156,6 +156,8 @@ Optional:
 Settings panes:
 - Setup: OAuth, connection test, project preload
 - Rules: add/edit rules, apply custom presets, save exact rule as preset
+  - each rule now has inline quick summary + quick setup hint
+  - advanced per-rule options are hidden behind `Advanced` button in `Rule actions`
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
 ## Commands

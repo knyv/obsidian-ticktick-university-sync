@@ -77,6 +77,12 @@
   opacity: 0.65;
 }
 
+.ticktick-flow-rule-summary-inline {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
 .ticktick-flow-inline-toggle {
   transform: scale(1.1);
 }
@@ -178,4 +184,18 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.ticktick-flow-rule-quickstart {
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 4px 0 10px 0;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
+}
+
+.ticktick-flow-rule-quickstart p {
+  margin: 0;
+  font-size: 12px;
 }
