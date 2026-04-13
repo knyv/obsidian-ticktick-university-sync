@@ -1,5 +1,5 @@
 import { Notice, Plugin } from 'obsidian';
-import { DEFAULT_SCOPES } from './constants';
+import { DEFAULT_SCOPES, TICKTICK_DEVELOPER_APPS_URL } from './constants';
 import { DEFAULT_SETTINGS, migrateSettings } from './defaults';
 import { exchangeCodeForToken, buildOAuthAuthorizeUrl, refreshToken } from './oauth';
 import { PluginApi } from './pluginApi';
@@ -47,12 +47,28 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
 
     this.addCommand({
+      id: 'ticktick-flow-open-developer-apps',
+      name: 'Open TickTick Developer Apps page',
+      callback: async () => {
+        this.openTickTickDeveloperPage();
+      },
+    });
+
+    this.addCommand({
       id: 'ticktick-flow-exchange-auth-code',
       name: 'Exchange TickTick auth code/URL',
       callback: async () => {
         new AuthCodeModal(this.app, async (input) => {
           await this.exchangeAuthCode(input);
         }).open();
+      },
+    });
+
+    this.addCommand({
+      id: 'ticktick-flow-exchange-auth-from-clipboard',
+      name: 'Exchange TickTick auth from clipboard',
+      callback: async () => {
+        await this.exchangeAuthCodeFromClipboard();
       },
     });
 
@@ -128,6 +144,11 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     new Notice('Opened TickTick OAuth page. Authorize, then paste redirect URL/code back.');
   }
 
+  openTickTickDeveloperPage() {
+    window.open(TICKTICK_DEVELOPER_APPS_URL, '_blank');
+    new Notice('Opened TickTick developer apps page.');
+  }
+
   async exchangeAuthCode(input: string) {
     if (!this.settings.clientId || !this.settings.clientSecret) {
       new Notice('Set TickTick Client ID + Client Secret first.');
@@ -148,6 +169,19 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     await this.saveSettings();
 
     new Notice('TickTick connected successfully.');
+  }
+
+  async exchangeAuthCodeFromClipboard() {
+    if (!navigator?.clipboard) {
+      throw new Error('Clipboard access unavailable. Use manual paste instead.');
+    }
+
+    const text = await navigator.clipboard.readText();
+    if (!text?.trim()) {
+      throw new Error('Clipboard is empty. Copy redirect URL/code first.');
+    }
+
+    await this.exchangeAuthCode(text);
   }
 
   async refreshAccessToken() {

@@ -8,8 +8,10 @@ export interface PluginApi {
   syncNow: () => Promise<void>;
   testConnection: () => Promise<void>;
   listProjects: () => Promise<TickTickProject[]>;
+  openTickTickDeveloperPage: () => void;
   openOAuthUrl: () => void;
   exchangeAuthCode: (input: string) => Promise<void>;
+  exchangeAuthCodeFromClipboard: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
   discoverAndSelectProject: (ruleId?: string) => Promise<void>;
 }

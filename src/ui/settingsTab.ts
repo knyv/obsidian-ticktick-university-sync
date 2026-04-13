@@ -24,12 +24,38 @@ function setupStatusText(plugin: PluginApi): string {
   const exp = plugin.settings.tokenExpiryMs ? new Date(plugin.settings.tokenExpiryMs).toLocaleString() : 'not set';
 
   return [
+    'Quick setup status:',
     `1) App keys: ${hasClient ? 'ok' : 'missing'}`,
     `2) OAuth token: ${hasToken ? 'ok' : 'missing'} (expiry: ${exp})`,
     `3) Rule configured: ${hasRule ? 'ok' : 'missing'}`,
     `4) Target project hint: ${hasProject ? 'ok' : 'missing'}`,
     `5) Ready to test sync: ${hasClient && hasToken && hasRule ? 'yes' : 'no'}`,
   ].join('\n');
+}
+
+function oauthHowToText(): string {
+  return [
+    'How to connect TickTick (2-3 minutes):',
+    '1) Click "Open TickTick Developer Apps"',
+    '2) Create/select app, then set Redirect URI to EXACTLY: https://localhost/',
+    '3) Copy Client ID + Client Secret into this plugin',
+    '4) Click "Open OAuth URL" and approve access',
+    '5) Copy final redirect URL (or code)',
+    '6) Click "Exchange from Clipboard" (or manual Exchange)',
+    '',
+    'Tip: Redirect URI must be identical in both places, including trailing slash.',
+  ].join('\\n');
+}
+
+function rulesHowToText(): string {
+  return [
+    'How rules work:',
+    '- A note is included if it has ANY include tag and NONE of the exclude tags.',
+    '- Due date is read from the first non-empty field in Due fields list.',
+    '- Sync mode upsert = create/update, create_only = only new tasks.',
+    '- Use one rule per context (University, Work, Personal).',
+    '- Use Dry run first when changing rules or templates.',
+  ].join('\\n');
 }
 
 export class TickTickSyncSettingTab extends PluginSettingTab {
@@ -342,6 +368,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h3', { text: 'Quick setup wizard' });
     containerEl.createEl('pre', { text: setupStatusText(this.plugin) });
+    containerEl.createEl('pre', { text: oauthHowToText() });
 
     new Setting(containerEl)
       .setName('Client ID')
@@ -416,6 +443,15 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('Open TickTick Developer Apps')
+      .setDesc('Create/configure app at developer.ticktick.com and set redirect URI there')
+      .addButton((btn) =>
+        btn.setButtonText('Open').onClick(() => {
+          this.plugin.openTickTickDeveloperPage();
+        }),
+      );
+
+    new Setting(containerEl)
       .setName('Open OAuth URL')
       .setDesc('Step 1: authorize in browser')
       .addButton((btn) =>
@@ -433,6 +469,16 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
             await this.plugin.exchangeAuthCode(input);
             this.display();
           }).open();
+        }),
+      )
+      .addButton((btn) =>
+        btn.setButtonText('Exchange from Clipboard').onClick(async () => {
+          try {
+            await this.plugin.exchangeAuthCodeFromClipboard();
+            this.display();
+          } catch (e) {
+            new Notice(e instanceof Error ? e.message : String(e));
+          }
         }),
       );
 
@@ -569,6 +615,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl('h3', { text: 'Rules (scenario profiles)' });
+    containerEl.createEl('pre', { text: rulesHowToText() });
 
     new Setting(containerEl)
       .setName('Add rule')
