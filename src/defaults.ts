@@ -22,15 +22,11 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     syncMode: 'upsert',
     completedKeywords: ['completed', 'complete', 'done', 'finished'],
     titleTemplate: '{{noteTitle}}',
-    contentTemplate: `Task: {{noteTitle}}
-Class: {{class}}
-Due: {{duePretty}}
-Tags: {{tags}}
-Open note: {{obsidianLink}}`,
-    descTemplate: `Status: {{status}}
-Project: {{projectName}}
-Path: {{filePath}}
-Rule: {{ruleName}}`,
+    contentTemplate: ``,
+    descTemplate: `Open note: {{obsidianLink}}
+Path: {{filePath}}`,
+    ticktickTagsField: 'ticktick_tags',
+    tagSourceMode: 'all_note_tags',
     ...overrides,
   };
 }
@@ -134,6 +130,10 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       Array.isArray(rule.completedKeywords) && rule.completedKeywords.length
         ? rule.completedKeywords
         : ['completed', 'complete', 'done', 'finished'],
+    ticktickTagsField: typeof rule.ticktickTagsField === 'string' && rule.ticktickTagsField.trim()
+      ? rule.ticktickTagsField
+      : 'ticktick_tags',
+    tagSourceMode: rule.tagSourceMode === 'include_tags' ? 'include_tags' : 'all_note_tags',
   }));
 
   if (!merged.trackingMode) merged.trackingMode = 'frontmatter';
@@ -154,22 +154,15 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
   merged.rules = merged.rules.map((rule) => ({
     ...rule,
     contentTemplate:
-      typeof (rule as { contentTemplate?: unknown }).contentTemplate === 'string' &&
-      String((rule as { contentTemplate?: unknown }).contentTemplate).trim()
+      typeof (rule as { contentTemplate?: unknown }).contentTemplate === 'string'
         ? String((rule as { contentTemplate?: unknown }).contentTemplate)
-        : `Task: {{noteTitle}}
-Class: {{class}}
-Due: {{duePretty}}
-Tags: {{tags}}
-Open note: {{obsidianLink}}`,
+        : ``,
     descTemplate:
       typeof (rule as { descTemplate?: unknown }).descTemplate === 'string' &&
       String((rule as { descTemplate?: unknown }).descTemplate).trim()
         ? String((rule as { descTemplate?: unknown }).descTemplate)
-        : `Status: {{status}}
-Project: {{projectName}}
-Path: {{filePath}}
-Rule: {{ruleName}}`,
+        : `Open note: {{obsidianLink}}
+Path: {{filePath}}`,
   }));
 
   return merged;

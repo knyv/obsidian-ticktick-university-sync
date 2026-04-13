@@ -79,6 +79,18 @@ export async function collectCandidates(app: App, settings: TickTickUniversitySy
   return candidates;
 }
 
+function collectTickTickTags(candidate: SyncCandidate): string[] {
+  const source = candidate.rule.tagSourceMode === 'include_tags' ? candidate.rule.tagsAny : candidate.tags;
+  const fromSource = source.map(normalizeTag).filter(Boolean);
+
+  const extra = toStringArray(candidate.frontmatter[candidate.rule.ticktickTagsField || 'ticktick_tags'])
+    .map(normalizeTag)
+    .filter(Boolean);
+
+  const merged = Array.from(new Set([...fromSource, ...extra]));
+  return merged;
+}
+
 function buildTaskPayload(
   app: App,
   candidate: SyncCandidate,
@@ -92,6 +104,7 @@ function buildTaskPayload(
   const noteLink = getObsidianDeepLink(app, candidate.file);
   const statusText = toStringArray(candidate.statusRaw).join(', ') || String(candidate.statusRaw ?? '').trim();
   const tagsText = candidate.tags.join(', ');
+  const ticktickTags = collectTickTickTags(candidate);
 
   const tokens: Record<string, string> = {
     noteTitle: candidate.file.basename,
@@ -138,6 +151,7 @@ function buildTaskPayload(
     title: title || candidate.file.basename,
     content,
     desc: desc || undefined,
+    tags: ticktickTags.length ? ticktickTags : undefined,
     isAllDay: due.isAllDay,
     startDate: due.startDate,
     dueDate: due.dueDate,

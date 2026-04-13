@@ -2,6 +2,7 @@ import { TFile } from 'obsidian';
 
 export type SyncMode = 'upsert' | 'create_only';
 export type TrackingMode = 'frontmatter' | 'local_json';
+export type TagSourceMode = 'all_note_tags' | 'include_tags';
 
 export interface CustomRulePreset {
   id: string;
@@ -49,7 +50,12 @@ export interface SyncRule {
   titleTemplate: string;
   contentTemplate: string;
   descTemplate: string;
+
+  // optional metadata mappings
+  ticktickTagsField?: string;
+  tagSourceMode?: TagSourceMode;
 }
+
 
 export interface TickTickUniversitySyncSettings {
   clientId: string;
@@ -88,6 +94,7 @@ export type TickTickTaskPayload = {
   title: string;
   content?: string;
   desc?: string;
+  tags?: string[];
   isAllDay?: boolean;
   startDate?: string;
   dueDate?: string;

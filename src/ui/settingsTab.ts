@@ -77,6 +77,7 @@ function addRulesGuideBlock(containerEl: HTMLElement): void {
     'Due date uses the first non-empty key in Due fields list (left to right).',
     'Use one rule per context: Deadlines, Work items, Personal tasks.',
     'Each rule is grouped into: Match notes -> Project target -> Sync behavior -> Task formatting.',
+    'Project target must be explicitly selected for each enabled rule.',
     'Start with Dry run before real sync.',
   ].forEach((line) => ul.createEl('li', { text: line }));
 }
@@ -106,7 +107,11 @@ function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyToken
   const block = addInfoBlock(containerEl, 'Task formatting help');
   const ul = block.createEl('ul');
   [
-    'Templates control how title/content/description appear in TickTick.',
+    'Title template sets task title (most important field).',
+    'Content template maps to TickTick task content/body.',
+    'Description template maps to TickTick description/notes.',
+    'Use one of content/description for details to avoid redundancy.',
+    'Obsidian links may not open in every TickTick client; desktop/browser support varies.',
     'Press Enter in template textareas for real line breaks (recommended).',
     'Literal \\n is also supported and converted automatically.',
     'Start with a preset, then tweak template text.',
@@ -118,7 +123,7 @@ function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyToken
     '{{noteTitle}} = note filename without .md',
     '{{filePath}} = full vault-relative note path',
     '{{class}} = class field value from note properties',
-    '{{obsidianLink}} = obsidian:// deep link to this note',
+    '{{obsidianLink}} = clickable Obsidian URL (works if your device/browser supports obsidian:// links)',
     '{{ruleName}} = current rule name',
     '{{dueRaw}} = raw due property value',
     '{{duePretty}} = formatted due date/time',
@@ -365,30 +370,20 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       .setName('Formatting presets')
       .setDesc('Apply a starter template set, then edit below if needed.')
       .addButton((btn) =>
-        btn.setButtonText('Clean').onClick(async () => {
+        btn.setButtonText('Minimal').onClick(async () => {
           rule.titleTemplate = '{{noteTitle}}';
-          rule.contentTemplate = `Due: {{duePretty}}
-Class: {{class}}
-Open note: {{obsidianLink}}`;
-          rule.descTemplate = `Path: {{filePath}}
-Tags: {{tags}}
-Rule: {{ruleName}}`;
+          rule.contentTemplate = '';
+          rule.descTemplate = '';
           await this.plugin.saveSettings();
           this.display();
         }),
       )
       .addButton((btn) =>
-        btn.setButtonText('Detailed').onClick(async () => {
-          rule.titleTemplate = '{{noteTitle}} · {{duePretty}}';
-          rule.contentTemplate = `Task: {{noteTitle}}
-Due: {{duePretty}}
-Class: {{class}}
-Tags: {{tags}}
-Open note: {{obsidianLink}}`;
-          rule.descTemplate = `Status: {{status}}
-Project: {{projectName}}
-Path: {{filePath}}
-Rule: {{ruleName}}`;
+        btn.setButtonText('Notes-focused').onClick(async () => {
+          rule.titleTemplate = '{{noteTitle}}';
+          rule.contentTemplate = '';
+          rule.descTemplate = `Open note: {{obsidianLink}}
+Path: {{filePath}}`;
           await this.plugin.saveSettings();
           this.display();
         }),
@@ -405,22 +400,49 @@ Rule: {{ruleName}}`;
 
     new Setting(containerEl)
       .setName('Task content template')
-      .setDesc('Multi-line supported: press Enter for line breaks. \\n also works.')
+      .setDesc('TickTick task content/body. Keep short to avoid redundancy with due/date UI.')
       .addTextArea((text) =>
         text.setValue(rule.contentTemplate).onChange(async (value) => {
-          rule.contentTemplate = value || 'Source: [{{noteTitle}}]({{obsidianLink}})';
+          rule.contentTemplate = value;
           await this.plugin.saveSettings();
         }),
       );
 
     new Setting(containerEl)
       .setName('Task description template')
-      .setDesc('Multi-line supported: press Enter for line breaks. \\n also works.')
+      .setDesc('TickTick description/notes field. Use this OR content template to avoid duplicate metadata.')
       .addTextArea((text) =>
         text.setValue(rule.descTemplate || '').onChange(async (value) => {
           rule.descTemplate = value || '';
           await this.plugin.saveSettings();
         }),
+      );
+
+    new Setting(containerEl)
+      .setName('TickTick tags field (optional)')
+      .setDesc('Frontmatter property containing tags to add in TickTick (comma list or YAML array).')
+      .addText((text) =>
+        text
+          .setPlaceholder('ticktick_tags')
+          .setValue(rule.ticktickTagsField || 'ticktick_tags')
+          .onChange(async (value) => {
+            rule.ticktickTagsField = value.trim() || 'ticktick_tags';
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName('TickTick tags source')
+      .setDesc('Choose whether tags come from all note tags or only include-tags, plus optional ticktick_tags field')
+      .addDropdown((d) =>
+        d
+          .addOption('all_note_tags', 'All note tags (recommended)')
+          .addOption('include_tags', 'Only include-tags from this rule')
+          .setValue(rule.tagSourceMode || 'all_note_tags')
+          .onChange(async (value) => {
+            rule.tagSourceMode = value === 'include_tags' ? 'include_tags' : 'all_note_tags';
+            await this.plugin.saveSettings();
+          }),
       );
 
     if (this.showAdvanced) {
@@ -640,14 +662,14 @@ Rule: {{ruleName}}`;
 
     new Setting(containerEl)
       .setName('Connection & projects')
-      .setDesc('Recommended: click "Load + test projects" first, then choose project per rule')
+      .setDesc('Recommended: click "Load + test projects" first, then choose project per enabled rule')
       .addButton((btn) =>
         btn.setButtonText('Load + test projects').setClass('mod-cta').onClick(async () => {
           try {
             await this.plugin.testConnection();
             await this.plugin.preloadProjects();
             this.projects = await this.plugin.listProjects();
-            new Notice(`Ready: loaded ${this.projects.length} projects. Now select target project per rule.`);
+            new Notice(`Ready: loaded ${this.projects.length} projects. Now select target project per enabled rule.`);
             this.display();
           } catch (e) {
             new Notice(e instanceof Error ? e.message : String(e));

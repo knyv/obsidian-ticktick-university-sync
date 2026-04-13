@@ -62,12 +62,12 @@ Built-in template tokens:
 - `{{noteTitle}}` = note filename without `.md`
 - `{{filePath}}` = vault-relative note path
 - `{{class}}` = class property value
-- `{{obsidianLink}}` = obsidian deep link to note
+- `{{obsidianLink}}` = obsidian deep link to note (opens only if client/device supports `obsidian://`)
 - `{{ruleName}}` = current sync rule name
 - `{{dueRaw}}` = raw due property value
 - `{{duePretty}}` = formatted due date/time text
 - `{{status}}` = status property value
-- `{{tags}}` = tags as comma-separated text
+- `{{tags}}` = note tags as comma-separated text
 - `{{projectName}}` = selected TickTick project name
 
 Custom property tokens:
@@ -78,9 +78,21 @@ Line breaks:
 - Press Enter in template textareas (recommended)
 - Literal `\n` is also supported
 
+Non-redundant default strategy:
+- Let TickTick own due date/status/project metadata in native fields
+- Keep content/description templates minimal (for note link/path/context only)
+
+Tag mapping to TickTick:
+- Each rule now supports TickTick tags mapping:
+  - `TickTick tags source`: all note tags OR only rule include-tags
+  - `TickTick tags field`: optional frontmatter field (default `ticktick_tags`)
+- Example frontmatter:
+  - `ticktick_tags: [urgent, reading]`
+  - or `ticktick_tags: urgent, reading`
+
 Formatting presets included:
-- Clean
-- Detailed
+- Minimal
+- Notes-focused
 
 ## Tracking mode (note metadata vs local file)
 
