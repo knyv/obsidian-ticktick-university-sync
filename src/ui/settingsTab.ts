@@ -58,6 +58,11 @@ function rulesHowToText(): string {
   ].join('\\n');
 }
 
+function addInfoBlock(containerEl: HTMLElement, text: string): void {
+  const el = containerEl.createEl('div', { cls: 'ticktick-flow-info' });
+  el.setText(text);
+}
+
 export class TickTickSyncSettingTab extends PluginSettingTab {
   plugin: PluginApi;
   private projects: TickTickProject[] = [];
@@ -367,8 +372,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'TickTick Flow Sync' });
 
     containerEl.createEl('h3', { text: 'Quick setup wizard' });
-    containerEl.createEl('pre', { text: setupStatusText(this.plugin) });
-    containerEl.createEl('pre', { text: oauthHowToText() });
+    addInfoBlock(containerEl, setupStatusText(this.plugin));
+    addInfoBlock(containerEl, oauthHowToText());
 
     new Setting(containerEl)
       .setName('Client ID')
@@ -615,7 +620,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl('h3', { text: 'Rules (scenario profiles)' });
-    containerEl.createEl('pre', { text: rulesHowToText() });
+    addInfoBlock(containerEl, rulesHowToText());
 
     new Setting(containerEl)
       .setName('Add rule')
