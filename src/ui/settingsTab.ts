@@ -75,7 +75,7 @@ function addRulesGuideBlock(containerEl: HTMLElement): void {
   [
     'A note matches when it has ANY include tag and NONE of the exclude tags.',
     'Due date uses the first non-empty key in Due fields list (left to right).',
-    'Use one rule per context: University, Work, Personal.',
+    'Use one rule per context: Deadlines, Work items, Personal tasks.',
     'Each rule is grouped into: Match notes -> Project target -> Sync behavior -> Task formatting.',
     'Start with Dry run before real sync.',
   ].forEach((line) => ul.createEl('li', { text: line }));
@@ -85,13 +85,33 @@ function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyToken
   const block = addInfoBlock(containerEl, 'Task formatting help');
   const ul = block.createEl('ul');
   [
-    'Title/content/description are optional templates sent to TickTick.',
-    'Built-in tokens: {{noteTitle}}, {{duePretty}}, {{class}}, {{obsidianLink}}, {{status}}, {{tags}}, {{projectName}}.',
-    'Press Enter in the text box for real line breaks (recommended).',
+    'Templates control how title/content/description appear in TickTick.',
+    'Press Enter in template textareas for real line breaks (recommended).',
     'Literal \\n is also supported and converted automatically.',
-    `Custom property tokens: ${allowAllPropertyTokens ? 'enabled' : 'disabled'} (for example {{priority}}).`,
-    'Use preset buttons first, then tweak.',
+    'Start with a preset, then tweak template text.',
   ].forEach((line) => ul.createEl('li', { text: line }));
+
+  const tokenBlock = addInfoBlock(containerEl, 'Template tokens reference');
+  const builtIn = tokenBlock.createEl('ul');
+  [
+    '{{noteTitle}} = note filename without .md',
+    '{{filePath}} = full vault-relative note path',
+    '{{class}} = class field value from note properties',
+    '{{obsidianLink}} = obsidian:// deep link to this note',
+    '{{ruleName}} = current rule name',
+    '{{dueRaw}} = raw due property value',
+    '{{duePretty}} = formatted due date/time',
+    '{{status}} = status property value',
+    '{{tags}} = note tags as comma-separated text',
+    '{{projectName}} = selected TickTick project name',
+  ].forEach((line) => builtIn.createEl('li', { text: line }));
+
+  const custom = tokenBlock.createEl('p');
+  custom.setText(
+    allowAllPropertyTokens
+      ? 'Custom property tokens are enabled: you can use any note property as {{propertyName}} (example: {{priority}}, {{teacher}}).'
+      : 'Custom property tokens are disabled: only built-in tokens above will resolve. Enable "Template token mode" in global settings to allow any {{propertyName}} token.',
+  );
 }
 
 export class TickTickSyncSettingTab extends PluginSettingTab {
@@ -109,7 +129,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     if (preset === 'academic-deadlines') {
       rule = makeUniversityRule({
         id: makeRuleId('academic-deadlines'),
-        name: 'Academic deadlines',
+        name: 'Deadlines',
         tagsAny: ['university/assignments', 'university/exams'],
         dueFields: ['due', 'deadline', 'exam_date'],
         targetProjectName: 'University',
@@ -656,7 +676,7 @@ Rule: {{ruleName}}`;
       .setName('Create rule from preset')
       .setDesc('Choose based on what the rule does')
       .addButton((btn) =>
-        btn.setButtonText('Academic deadlines').onClick(async () => {
+        btn.setButtonText('Deadlines').onClick(async () => {
           await this.addRuleFromPreset('academic-deadlines');
         }),
       )

@@ -58,19 +58,25 @@ Per rule you can customize:
 - `Task content template`
 - `Task description template (desc)`
 
-Supported template tokens:
-- `{{noteTitle}}`
-- `{{filePath}}`
-- `{{class}}`
-- `{{obsidianLink}}`
-- `{{ruleName}}`
-- `{{dueRaw}}`
-- `{{duePretty}}`
-- `{{status}}`
-- `{{tags}}`
-- `{{projectName}}`
+Built-in template tokens:
+- `{{noteTitle}}` = note filename without `.md`
+- `{{filePath}}` = vault-relative note path
+- `{{class}}` = class property value
+- `{{obsidianLink}}` = obsidian deep link to note
+- `{{ruleName}}` = current sync rule name
+- `{{dueRaw}}` = raw due property value
+- `{{duePretty}}` = formatted due date/time text
+- `{{status}}` = status property value
+- `{{tags}}` = tags as comma-separated text
+- `{{projectName}}` = selected TickTick project name
 
-Use `\n` for line breaks.
+Custom property tokens:
+- If "Template token mode" is enabled, any frontmatter property can be used as `{{propertyName}}`
+  (example: `{{priority}}`, `{{teacher}}`, `{{module}}`).
+
+Line breaks:
+- Press Enter in template textareas (recommended)
+- Literal `\n` is also supported
 
 Formatting presets included:
 - Clean
