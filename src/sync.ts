@@ -477,6 +477,21 @@ export async function runSync(
         summary.completed += 1;
       }
 
+      // Keep TickTick status aligned with Obsidian status mapping.
+      // If Obsidian says task is open but TickTick still shows completed, force it back to open.
+      if (!completed && currentTaskId && candidate.rule.taskStatusSyncMode === 'obsidian_to_ticktick') {
+        phase = 'verify-open-status';
+        const remote = await client.getTask(currentProjectId, currentTaskId).catch(() => undefined);
+        if ((remote?.status ?? 0) === 2) {
+          phase = 'force-open-status';
+          await client.updateTask(currentTaskId, { ...payload, status: 0 });
+
+          // Last fallback for APIs/clients that ignore status=0 in update payload.
+          phase = 'reopen-task';
+          await client.reopenTask(currentProjectId, currentTaskId).catch(() => undefined);
+        }
+      }
+
       if (currentTaskId) {
         if (settings.trackingMode === 'frontmatter') {
           phase = 'write-frontmatter';

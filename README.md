@@ -203,6 +203,9 @@ Status sync behavior:
   - `Status property type`: `Text/list values` or `Checkbox`
   - `Status values treated as completed` (text/list)
   - `Status values treated as open` (text/list)
+- Bidirectional result during sync:
+  - Completed in Obsidian -> task completed in TickTick
+  - Open/not-started in Obsidian -> task forced open (unchecked) in TickTick
 
 Guides/help blocks in settings:
 - Rule guide, preset guide, task content help, and template tokens are now visible in all modes.

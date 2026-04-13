@@ -6,6 +6,11 @@ export class TickTickClient {
   private getAccessToken: () => Promise<string>;
   private refreshIfNeeded: () => Promise<void>;
 
+  private isEmptyJsonParseError(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err);
+    return msg.toLowerCase().includes('unexpected end of json input');
+  }
+
   constructor(args: { getAccessToken: () => Promise<string>; refreshIfNeeded: () => Promise<void> }) {
     this.getAccessToken = args.getAccessToken;
     this.refreshIfNeeded = args.refreshIfNeeded;
@@ -83,10 +88,26 @@ export class TickTickClient {
         {},
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
       // TickTick complete endpoint can return empty body; some clients surface JSON parse error even when completion succeeded.
-      if (msg.toLowerCase().includes('unexpected end of json input')) {
+      if (this.isEmptyJsonParseError(e)) {
         console.warn('[TickTick Flow Sync] Ignoring empty-body JSON parse error from complete endpoint', { projectId, taskId });
+        return;
+      }
+      throw e;
+    }
+  }
+
+  async reopenTask(projectId: string, taskId: string): Promise<void> {
+    try {
+      await this.request(
+        `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}/close`,
+        'POST',
+        {},
+      );
+    } catch (e) {
+      // TickTick reopen/close-style endpoints can also return empty body.
+      if (this.isEmptyJsonParseError(e)) {
+        console.warn('[TickTick Flow Sync] Ignoring empty-body JSON parse error from reopen endpoint', { projectId, taskId });
         return;
       }
       throw e;
