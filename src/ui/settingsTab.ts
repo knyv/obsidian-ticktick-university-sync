@@ -175,6 +175,24 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     this.display();
   }
 
+  private async addBlankRule() {
+    const n = this.plugin.settings.rules.length + 1;
+    const rule = makeUniversityRule({
+      id: makeRuleId('rule'),
+      name: `New rule ${n}`,
+      tagsAny: [],
+      excludeTagsAny: [],
+      dueFields: ['due', 'deadline'],
+      targetProjectId: '',
+      targetProjectName: this.plugin.settings.fallbackProjectName || 'Inbox',
+    });
+
+    this.plugin.settings.rules.push(rule);
+    this.expandedRuleIds.add(rule.id);
+    await this.plugin.saveSettings();
+    this.display();
+  }
+
   private ruleFromPreset(preset: CustomRulePreset): SyncRule {
     return makeUniversityRule({
       id: makeRuleId(preset.id),
@@ -764,29 +782,59 @@ Rule: {{ruleName}}`;
     containerEl.createEl('h3', { text: '3) Rules (what gets synced)' });
     addRulesGuideBlock(containerEl);
 
-    new Setting(containerEl)
-      .setName('Add new rule (quick presets)')
-      .setDesc('Create a new rule instantly from a preset')
+    containerEl.createEl('h4', { text: 'Add new rule' });
+
+    const addRuleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-add-rule-grid' });
+
+    const addBlank = new Setting(addRuleWrap)
+      .setName('Start from scratch')
+      .setDesc('Create an empty rule with sensible defaults you can edit')
       .addButton((btn) =>
-        btn.setButtonText('+ Add Deadlines rule').setClass('mod-cta').onClick(async () => {
+        btn.setButtonText('+ Create blank rule').setClass('mod-cta').onClick(async () => {
+          await this.addBlankRule();
+        }),
+      );
+    addBlank.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addDeadlines = new Setting(addRuleWrap)
+      .setName('Preset: Deadlines')
+      .setDesc('Due-date focused notes (generic)')
+      .addButton((btn) =>
+        btn.setButtonText('+ Add Deadlines rule').onClick(async () => {
           await this.addRuleFromPreset('deadlines');
         }),
-      )
+      );
+    addDeadlines.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addPersonal = new Setting(addRuleWrap)
+      .setName('Preset: Personal tasks')
+      .setDesc('Personal/home/admin style tasks')
       .addButton((btn) =>
         btn.setButtonText('+ Add Personal tasks rule').onClick(async () => {
           await this.addRuleFromPreset('personal-tasks');
         }),
-      )
+      );
+    addPersonal.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addWork = new Setting(addRuleWrap)
+      .setName('Preset: Work items')
+      .setDesc('Work/project related tasks')
       .addButton((btn) =>
         btn.setButtonText('+ Add Work items rule').onClick(async () => {
           await this.addRuleFromPreset('work-items');
         }),
-      )
+      );
+    addWork.settingEl.addClass('ticktick-flow-add-rule-row');
+
+    const addCustom = new Setting(addRuleWrap)
+      .setName('Preset: Custom (selected below)')
+      .setDesc('Apply your selected saved custom preset')
       .addButton((btn) =>
         btn.setButtonText('+ Add selected custom preset').onClick(async () => {
           await this.addRuleFromPreset('custom');
         }),
       );
+    addCustom.settingEl.addClass('ticktick-flow-add-rule-row');
 
     addPresetGuideBlock(containerEl, this.plugin);
 

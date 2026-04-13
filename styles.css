@@ -119,3 +119,24 @@
 .ticktick-flow-action-row button {
   width: 100%;
 }
+
+.ticktick-flow-add-rule-grid {
+  margin: 8px 0 12px 0;
+}
+
+.ticktick-flow-add-rule-row {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--background-secondary);
+}
+
+.ticktick-flow-add-rule-row .setting-item-control {
+  min-width: 280px;
+  justify-content: flex-end;
+}
+
+.ticktick-flow-add-rule-row button {
+  width: 100%;
+}
