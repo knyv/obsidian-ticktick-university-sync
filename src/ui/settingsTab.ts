@@ -16,61 +16,79 @@ function listToCsv(v: string[]): string {
   return (v ?? []).join(', ');
 }
 
-function setupStatusText(plugin: PluginApi): string {
+type ChecklistItem = { done: boolean; text: string };
+
+function setupChecklist(plugin: PluginApi): { items: ChecklistItem[]; tokenExpiry: string } {
   const hasClient = Boolean(plugin.settings.clientId && plugin.settings.clientSecret);
   const hasToken = Boolean(plugin.settings.accessToken);
   const hasRule = plugin.settings.rules.length > 0;
   const hasProject = plugin.settings.rules.some((r) => r.targetProjectId || r.targetProjectName);
-  const exp = plugin.settings.tokenExpiryMs ? new Date(plugin.settings.tokenExpiryMs).toLocaleString() : 'not set';
 
-  return [
-    'Setup checklist:',
-    `${hasClient ? '✅' : '⬜'} 1) Add Client ID + Client Secret`,
-    `${hasToken ? '✅' : '⬜'} 2) Connect OAuth (token saved)`,
-    `${hasRule ? '✅' : '⬜'} 3) Create at least one rule`,
-    `${hasProject ? '✅' : '⬜'} 4) Select a TickTick project`,
-    `${hasClient && hasToken && hasRule ? '✅' : '⬜'} 5) Run test and sync`,
-    `Token expiry: ${exp}`,
-  ].join('\n');
+  return {
+    items: [
+      { done: hasClient, text: 'Add Client ID + Client Secret' },
+      { done: hasToken, text: 'Connect OAuth (token saved)' },
+      { done: hasRule, text: 'Create at least one rule' },
+      { done: hasProject, text: 'Select a TickTick project' },
+      { done: hasClient && hasToken && hasRule, text: 'Run Test API connection, then Sync now' },
+    ],
+    tokenExpiry: plugin.settings.tokenExpiryMs ? new Date(plugin.settings.tokenExpiryMs).toLocaleString() : 'not set',
+  };
 }
 
-function oauthHowToText(): string {
-  return [
-    'How to connect TickTick (beginner path):',
-    '1) Click "Open TickTick Developer Apps".',
-    '2) Create/select an app and set Redirect URI to EXACTLY: https://localhost/',
-    '3) Copy Client ID + Client Secret into this page.',
-    '4) Click "Open OAuth URL" and approve access in browser.',
-    '5) Copy final redirect URL from browser address bar.',
-    '6) Click "Exchange from Clipboard" (fastest) or manual Exchange.',
-    '',
-    'Important: Redirect URI must match exactly in BOTH places, including trailing slash.',
-  ].join('\n');
+function addInfoBlock(containerEl: HTMLElement, title: string): HTMLElement {
+  const block = containerEl.createEl('div', { cls: 'ticktick-flow-info' });
+  block.createEl('h4', { text: title });
+  return block;
 }
 
-function rulesHowToText(): string {
-  return [
-    'How rules work:',
-    '- A note matches when it has ANY include tag and NONE of the exclude tags.',
-    '- Due date uses first non-empty key in Due fields list (left-to-right).',
-    '- Use one rule per context: University, Work, Personal.',
-    '- Start with Dry run before real sync.',
-  ].join('\n');
+function addChecklistBlock(containerEl: HTMLElement, plugin: PluginApi): void {
+  const { items, tokenExpiry } = setupChecklist(plugin);
+  const block = addInfoBlock(containerEl, 'Setup checklist');
+  const ul = block.createEl('ul');
+  items.forEach((item) => {
+    ul.createEl('li', { text: `${item.done ? '✅' : '⬜'} ${item.text}` });
+  });
+  block.createEl('p', { text: `Token expiry: ${tokenExpiry}` });
 }
 
-function formattingHowToText(): string {
-  return [
-    'Formatting templates:',
-    '- Title/content/description are optional templates sent to TickTick.',
-    '- You can use tokens like {{noteTitle}}, {{duePretty}}, {{class}}, {{obsidianLink}}.',
-    '- Use \\n for new lines.',
-    '- Use preset buttons first, then tweak.',
-  ].join('\n');
+function addOAuthGuideBlock(containerEl: HTMLElement): void {
+  const block = addInfoBlock(containerEl, 'How to connect TickTick (beginner path)');
+  const ol = block.createEl('ol');
+  [
+    'Click "Open TickTick Developer Apps".',
+    'Create/select an app and set Redirect URI to EXACTLY: https://localhost/',
+    'Copy Client ID + Client Secret into this page.',
+    'Click "Open OAuth URL" and approve access in browser.',
+    'Copy final redirect URL from browser address bar.',
+    'Click "Exchange from Clipboard" (fastest) or use Manual Exchange.',
+  ].forEach((step) => ol.createEl('li', { text: step }));
+  block.createEl('p', {
+    text: 'Important: Redirect URI must match exactly in BOTH places, including trailing slash.',
+    cls: 'ticktick-flow-info-warning',
+  });
 }
 
-function addInfoBlock(containerEl: HTMLElement, text: string): void {
-  const el = containerEl.createEl('div', { cls: 'ticktick-flow-info' });
-  el.setText(text);
+function addRulesGuideBlock(containerEl: HTMLElement): void {
+  const block = addInfoBlock(containerEl, 'How rules work');
+  const ul = block.createEl('ul');
+  [
+    'A note matches when it has ANY include tag and NONE of the exclude tags.',
+    'Due date uses the first non-empty key in Due fields list (left to right).',
+    'Use one rule per context: University, Work, Personal.',
+    'Start with Dry run before real sync.',
+  ].forEach((line) => ul.createEl('li', { text: line }));
+}
+
+function addFormattingGuideBlock(containerEl: HTMLElement): void {
+  const block = addInfoBlock(containerEl, 'Formatting templates');
+  const ul = block.createEl('ul');
+  [
+    'Title/content/description are optional templates sent to TickTick.',
+    'Tokens supported: {{noteTitle}}, {{duePretty}}, {{class}}, {{obsidianLink}}, etc.',
+    'For line breaks, type \\n in the template text.',
+    'Use preset buttons first, then tweak.',
+  ].forEach((line) => ul.createEl('li', { text: line }));
 }
 
 export class TickTickSyncSettingTab extends PluginSettingTab {
@@ -219,7 +237,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    addInfoBlock(containerEl, formattingHowToText());
+    addFormattingGuideBlock(containerEl);
 
     new Setting(containerEl)
       .setName('Formatting presets')
@@ -374,8 +392,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     containerEl.createEl('p', { text: 'Beginner-friendly setup first. Advanced controls are optional.' });
 
     containerEl.createEl('h3', { text: '1) Connect your TickTick account' });
-    addInfoBlock(containerEl, setupStatusText(this.plugin));
-    addInfoBlock(containerEl, oauthHowToText());
+    addChecklistBlock(containerEl, this.plugin);
+    addOAuthGuideBlock(containerEl);
 
     new Setting(containerEl)
       .setName('Client ID')
@@ -577,7 +595,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl('h3', { text: '3) Rules (what gets synced)' });
-    addInfoBlock(containerEl, rulesHowToText());
+    addRulesGuideBlock(containerEl);
 
     new Setting(containerEl)
       .setName('Create rule from preset')

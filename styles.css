@@ -5,9 +5,6 @@
 }
 
 .ticktick-flow-info {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
   max-width: 100%;
   line-height: 1.45;
   padding: 10px 12px;
@@ -15,6 +12,29 @@
   border-radius: 8px;
   background: var(--background-secondary);
   margin: 8px 0 12px 0;
+}
+
+.ticktick-flow-info h4 {
+  margin: 0 0 8px 0;
+}
+
+.ticktick-flow-info p,
+.ticktick-flow-info li {
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.ticktick-flow-info ul,
+.ticktick-flow-info ol {
+  margin: 0 0 8px 18px;
+  padding: 0;
+}
+
+.ticktick-flow-info-warning {
+  margin-top: 8px !important;
+  color: var(--text-warning);
+  font-weight: 600;
 }
 
 .ticktick-flow-rule {
