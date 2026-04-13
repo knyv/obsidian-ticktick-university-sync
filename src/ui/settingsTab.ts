@@ -143,6 +143,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   private presetNameInput = '';
   private presetDescriptionInput = '';
   private selectedCustomPresetId = '';
+  private expandedRuleIds = new Set<string>();
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
@@ -169,6 +170,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     }
 
     this.plugin.settings.rules.push(rule);
+    this.expandedRuleIds.add(rule.id);
     await this.plugin.saveSettings();
     this.display();
   }
@@ -199,8 +201,60 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     return options;
   }
 
+  private ensureRuleExpanded(ruleId: string) {
+    if (!this.expandedRuleIds.size) {
+      this.expandedRuleIds.add(ruleId);
+    }
+  }
+
+  private ensureRuleExpansionState() {
+    const ids = new Set(this.plugin.settings.rules.map((r) => r.id));
+    for (const id of Array.from(this.expandedRuleIds)) {
+      if (!ids.has(id)) this.expandedRuleIds.delete(id);
+    }
+    if (!this.expandedRuleIds.size && this.plugin.settings.rules.length) {
+      this.expandedRuleIds.add(this.plugin.settings.rules[0].id);
+    }
+  }
+
   private renderRule(containerEl: HTMLElement, rule: SyncRule, idx: number) {
-    containerEl.createEl('h4', { text: `Rule ${idx + 1}: ${rule.name}` });
+    this.ensureRuleExpanded(rule.id);
+
+    const header = containerEl.createEl('div', { cls: 'ticktick-flow-rule-header' });
+    const headerLeft = header.createEl('div', { cls: 'ticktick-flow-rule-header-left' });
+    const isExpanded = this.expandedRuleIds.has(rule.id);
+
+    const collapseBtn = headerLeft.createEl('button', {
+      text: isExpanded ? '▾' : '▸',
+      cls: 'clickable-icon',
+    });
+    collapseBtn.addEventListener('click', () => {
+      if (this.expandedRuleIds.has(rule.id)) this.expandedRuleIds.delete(rule.id);
+      else this.expandedRuleIds.add(rule.id);
+      this.display();
+    });
+
+    headerLeft.createEl('h4', {
+      text: `Rule ${idx + 1}: ${rule.name}`,
+      cls: rule.enabled ? '' : 'ticktick-flow-rule-title-disabled',
+    });
+
+    const headerRight = header.createEl('div', { cls: 'ticktick-flow-rule-header-right' });
+    const enabledLabel = headerRight.createEl('span', { text: rule.enabled ? 'Enabled' : 'Disabled' });
+    enabledLabel.addClass(rule.enabled ? 'ticktick-flow-pill-enabled' : 'ticktick-flow-pill-disabled');
+
+    const enabledToggle = headerRight.createEl('input') as HTMLInputElement;
+    enabledToggle.type = 'checkbox';
+    enabledToggle.checked = rule.enabled;
+    enabledToggle.classList.add('ticktick-flow-inline-toggle');
+    enabledToggle.addEventListener('change', async () => {
+      rule.enabled = enabledToggle.checked;
+      await this.plugin.saveSettings();
+      this.display();
+    });
+
+    if (!isExpanded) return;
+
     containerEl.createEl('h5', { text: 'A) Match notes' });
 
     new Setting(containerEl)
@@ -210,12 +264,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         text.setValue(rule.name).onChange(async (value) => {
           rule.name = value.trim() || `Rule ${idx + 1}`;
           await this.plugin.saveSettings();
-        }),
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(rule.enabled).onChange(async (value) => {
-          rule.enabled = value;
-          await this.plugin.saveSettings();
+          this.display();
         }),
       );
 
@@ -458,6 +507,7 @@ Rule: {{ruleName}}`;
           const ok = window.confirm(`Delete rule "${rule.name}"? This cannot be undone.`);
           if (!ok) return;
           this.plugin.settings.rules = this.plugin.settings.rules.filter((r) => r.id !== rule.id);
+          this.expandedRuleIds.delete(rule.id);
           await this.plugin.saveSettings();
           this.display();
         }),
@@ -467,6 +517,7 @@ Rule: {{ruleName}}`;
   async display(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
+    this.ensureRuleExpansionState();
 
     containerEl.createEl('h2', { text: 'TickTick Flow Sync' });
     containerEl.createEl('p', { text: 'Beginner-friendly setup first. Advanced controls are optional.' });
@@ -714,25 +765,25 @@ Rule: {{ruleName}}`;
     addRulesGuideBlock(containerEl);
 
     new Setting(containerEl)
-      .setName('Create rule from preset')
-      .setDesc('Choose based on what the rule does')
+      .setName('Add new rule (quick presets)')
+      .setDesc('Create a new rule instantly from a preset')
       .addButton((btn) =>
-        btn.setButtonText('Deadlines').onClick(async () => {
+        btn.setButtonText('+ Add Deadlines rule').setClass('mod-cta').onClick(async () => {
           await this.addRuleFromPreset('deadlines');
         }),
       )
       .addButton((btn) =>
-        btn.setButtonText('Personal tasks').onClick(async () => {
+        btn.setButtonText('+ Add Personal tasks rule').onClick(async () => {
           await this.addRuleFromPreset('personal-tasks');
         }),
       )
       .addButton((btn) =>
-        btn.setButtonText('Work items').onClick(async () => {
+        btn.setButtonText('+ Add Work items rule').onClick(async () => {
           await this.addRuleFromPreset('work-items');
         }),
       )
       .addButton((btn) =>
-        btn.setButtonText('First custom preset').onClick(async () => {
+        btn.setButtonText('+ Add selected custom preset').onClick(async () => {
           await this.addRuleFromPreset('custom');
         }),
       );
@@ -819,5 +870,24 @@ Rule: {{ruleName}}`;
       const ruleWrap = containerEl.createEl('div', { cls: 'ticktick-flow-rule' });
       this.renderRule(ruleWrap, this.plugin.settings.rules[i], i);
     }
+
+    containerEl.createEl('h3', { text: '4) Danger zone' });
+    new Setting(containerEl)
+      .setName('Reset plugin settings to defaults')
+      .setDesc('Clears current rules/presets and restores default settings')
+      .addButton((btn) =>
+        btn.setWarning().setButtonText('Reset plugin settings').onClick(async () => {
+          const ok = window.confirm('Reset TickTick Flow Sync settings to defaults? This will remove your current rules and custom presets.');
+          if (!ok) return;
+          await this.plugin.resetSettingsToDefault();
+          this.projects = [];
+          this.expandedRuleIds.clear();
+          this.presetRuleIndexInput = '';
+          this.presetNameInput = '';
+          this.presetDescriptionInput = '';
+          this.selectedCustomPresetId = '';
+          this.display();
+        }),
+      );
   }
 }

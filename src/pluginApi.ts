@@ -17,4 +17,5 @@ export interface PluginApi {
   discoverAndSelectProject: (ruleId?: string) => Promise<void>;
   getBuiltInPresets: () => CustomRulePreset[];
   createCustomPresetFromRule: (ruleId: string, name: string, description: string) => Promise<void>;
+  resetSettingsToDefault: () => Promise<void>;
 }

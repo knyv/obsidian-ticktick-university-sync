@@ -309,6 +309,13 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     new Notice('Custom preset saved.');
   }
 
+  async resetSettingsToDefault() {
+    this.settings = migrateSettings(DEFAULT_SETTINGS);
+    this.cachedProjects = [];
+    await this.saveSettings();
+    new Notice('TickTick Flow Sync settings reset to defaults.');
+  }
+
   async syncNow() {
     const start = Date.now();
 
