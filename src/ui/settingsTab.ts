@@ -152,6 +152,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   private expansionInitialized = false;
   private presetEditorOpenByRuleId = new Set<string>();
   private advancedEditorOpenByRuleId = new Set<string>();
+  private formattingEditorOpenByRuleId = new Set<string>();
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
@@ -285,6 +286,9 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       rule.syncMode === 'upsert' ? 'upsert' : 'create-only',
     ];
 
+    const ready = rule.enabled && includeCount > 0 && hasProject;
+    const statusText = ready ? 'Ready to sync' : 'Needs setup';
+
     const collapseBtn = headerLeft.createEl('button', {
       text: isExpanded ? '▾' : '▸',
       cls: 'clickable-icon',
@@ -310,6 +314,9 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     const enabledLabel = headerRight.createEl('span', { text: rule.enabled ? 'Enabled' : 'Disabled' });
     enabledLabel.addClass(rule.enabled ? 'ticktick-flow-pill-enabled' : 'ticktick-flow-pill-disabled');
 
+    const readinessLabel = headerRight.createEl('span', { text: statusText });
+    readinessLabel.addClass(ready ? 'ticktick-flow-pill-ready' : 'ticktick-flow-pill-needs-setup');
+
     const enabledToggle = headerRight.createEl('input') as HTMLInputElement;
     enabledToggle.type = 'checkbox';
     enabledToggle.checked = rule.enabled;
@@ -324,6 +331,21 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     const quickStart = containerEl.createEl('div', { cls: 'ticktick-flow-rule-quickstart' });
     quickStart.createEl('p', { text: 'Quick setup (recommended order): 1) Include tags  2) Target project  3) Sync mode  4) Rule actions' });
+    if (!hasProject) {
+      const fixRow = quickStart.createEl('div', { cls: 'ticktick-flow-rule-quickstart-actions' });
+      const fixBtn = fixRow.createEl('button', { text: 'Fix this rule: load projects now' });
+      fixBtn.classList.add('mod-cta');
+      fixBtn.addEventListener('click', async () => {
+        try {
+          await this.plugin.preloadProjects();
+          this.projects = await this.plugin.listProjects();
+          new Notice('Projects loaded. Now select a target project in this rule.');
+          this.display();
+        } catch (e) {
+          new Notice(e instanceof Error ? e.message : String(e));
+        }
+      });
+    }
 
     containerEl.createEl('h5', { text: 'A) Match notes' });
 
@@ -458,86 +480,101 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl('h5', { text: 'D) Task formatting' });
-    addFormattingGuideBlock(containerEl, this.plugin.settings.allowAllPropertyTokens);
+    const showFormatting = this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode;
 
     new Setting(containerEl)
-      .setName('Formatting presets')
-      .setDesc('Apply a starter template set, then edit below if needed.')
+      .setName('Formatting section')
+      .setDesc(showFormatting ? 'Formatting controls are visible below.' : 'Hidden for focus. Open when you want to customize task text/layout.')
       .addButton((btn) =>
-        btn.setButtonText('Minimal').onClick(async () => {
-          rule.titleTemplate = '{{noteTitle}}';
-          rule.contentTemplate = '';
-          rule.descTemplate = '';
-          await this.plugin.saveSettings();
+        btn.setButtonText(showFormatting ? 'Hide formatting' : 'Customize formatting').onClick(() => {
+          if (this.formattingEditorOpenByRuleId.has(rule.id)) this.formattingEditorOpenByRuleId.delete(rule.id);
+          else this.formattingEditorOpenByRuleId.add(rule.id);
           this.display();
         }),
-      )
-      .addButton((btn) =>
-        btn.setButtonText('Notes-focused').onClick(async () => {
-          rule.titleTemplate = '{{noteTitle}}';
-          rule.contentTemplate = '';
-          rule.descTemplate = `Open note: {{obsidianMdLink}}
+      );
+
+    if (showFormatting) {
+      if (!this.plugin.settings.simpleMode) addFormattingGuideBlock(containerEl, this.plugin.settings.allowAllPropertyTokens);
+
+      new Setting(containerEl)
+        .setName('Formatting presets')
+        .setDesc('Apply a starter template set, then edit below if needed.')
+        .addButton((btn) =>
+          btn.setButtonText('Minimal').onClick(async () => {
+            rule.titleTemplate = '{{noteTitle}}';
+            rule.contentTemplate = '';
+            rule.descTemplate = '';
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+        )
+        .addButton((btn) =>
+          btn.setButtonText('Notes-focused').onClick(async () => {
+            rule.titleTemplate = '{{noteTitle}}';
+            rule.contentTemplate = '';
+            rule.descTemplate = `Open note: {{obsidianMdLink}}
 Path: {{filePath}}`;
-          await this.plugin.saveSettings();
-          this.display();
-        }),
-      );
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+        );
 
-    new Setting(containerEl)
-      .setName('Task title template')
-      .addText((text) =>
-        text.setValue(rule.titleTemplate).onChange(async (value) => {
-          rule.titleTemplate = value || '{{noteTitle}}';
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('Task content template')
-      .setDesc('TickTick task content/body. Markdown supported. Keep short to avoid redundancy with due/date UI.')
-      .addTextArea((text) =>
-        text.setValue(rule.contentTemplate).onChange(async (value) => {
-          rule.contentTemplate = value;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('Task description template')
-      .setDesc('TickTick description/notes field. Markdown supported. Use this OR content template to avoid duplicate metadata.')
-      .addTextArea((text) =>
-        text.setValue(rule.descTemplate || '').onChange(async (value) => {
-          rule.descTemplate = value || '';
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('TickTick tags field (optional)')
-      .setDesc('Frontmatter property containing tags to add in TickTick (comma list or YAML array).')
-      .addText((text) =>
-        text
-          .setPlaceholder('ticktick_tags')
-          .setValue(rule.ticktickTagsField || 'ticktick_tags')
-          .onChange(async (value) => {
-            rule.ticktickTagsField = value.trim() || 'ticktick_tags';
+      new Setting(containerEl)
+        .setName('Task title template')
+        .addText((text) =>
+          text.setValue(rule.titleTemplate).onChange(async (value) => {
+            rule.titleTemplate = value || '{{noteTitle}}';
             await this.plugin.saveSettings();
           }),
-      );
+        );
 
-    new Setting(containerEl)
-      .setName('TickTick tags source')
-      .setDesc('Choose whether tags come from all note tags or only include-tags, plus optional ticktick_tags field')
-      .addDropdown((d) =>
-        d
-          .addOption('all_note_tags', 'All note tags (recommended)')
-          .addOption('include_tags', 'Only include-tags from this rule')
-          .setValue(rule.tagSourceMode || 'all_note_tags')
-          .onChange(async (value) => {
-            rule.tagSourceMode = value === 'include_tags' ? 'include_tags' : 'all_note_tags';
+      new Setting(containerEl)
+        .setName('Task content template')
+        .setDesc('TickTick task content/body. Markdown supported. Keep short to avoid redundancy with due/date UI.')
+        .addTextArea((text) =>
+          text.setValue(rule.contentTemplate).onChange(async (value) => {
+            rule.contentTemplate = value;
             await this.plugin.saveSettings();
           }),
-      );
+        );
+
+      new Setting(containerEl)
+        .setName('Task description template')
+        .setDesc('TickTick description/notes field. Markdown supported. Use this OR content template to avoid duplicate metadata.')
+        .addTextArea((text) =>
+          text.setValue(rule.descTemplate || '').onChange(async (value) => {
+            rule.descTemplate = value || '';
+            await this.plugin.saveSettings();
+          }),
+        );
+
+      new Setting(containerEl)
+        .setName('TickTick tags field (optional)')
+        .setDesc('Frontmatter property containing tags to add in TickTick (comma list or YAML array).')
+        .addText((text) =>
+          text
+            .setPlaceholder('ticktick_tags')
+            .setValue(rule.ticktickTagsField || 'ticktick_tags')
+            .onChange(async (value) => {
+              rule.ticktickTagsField = value.trim() || 'ticktick_tags';
+              await this.plugin.saveSettings();
+            }),
+        );
+
+      new Setting(containerEl)
+        .setName('TickTick tags source')
+        .setDesc('Choose whether tags come from all note tags or only include-tags, plus optional ticktick_tags field')
+        .addDropdown((d) =>
+          d
+            .addOption('all_note_tags', 'All note tags (recommended)')
+            .addOption('include_tags', 'Only include-tags from this rule')
+            .setValue(rule.tagSourceMode || 'all_note_tags')
+            .onChange(async (value) => {
+              rule.tagSourceMode = value === 'include_tags' ? 'include_tags' : 'all_note_tags';
+              await this.plugin.saveSettings();
+            }),
+        );
+    }
 
     if (this.advancedEditorOpenByRuleId.has(rule.id) || this.showAdvanced) {
       containerEl.createEl('h5', { text: 'Advanced rule options' });
@@ -634,6 +671,13 @@ Path: {{filePath}}`;
         }),
       )
       .addButton((btn) =>
+        btn.setButtonText(this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode ? 'Hide formatting' : 'Formatting').onClick(() => {
+          if (this.formattingEditorOpenByRuleId.has(rule.id)) this.formattingEditorOpenByRuleId.delete(rule.id);
+          else this.formattingEditorOpenByRuleId.add(rule.id);
+          this.display();
+        }),
+      )
+      .addButton((btn) =>
         btn.setButtonText(this.advancedEditorOpenByRuleId.has(rule.id) ? 'Hide advanced' : 'Advanced').onClick(() => {
           if (this.advancedEditorOpenByRuleId.has(rule.id)) this.advancedEditorOpenByRuleId.delete(rule.id);
           else this.advancedEditorOpenByRuleId.add(rule.id);
@@ -659,6 +703,7 @@ Path: {{filePath}}`;
           this.expandedRuleIds.delete(rule.id);
           this.presetEditorOpenByRuleId.delete(rule.id);
           this.advancedEditorOpenByRuleId.delete(rule.id);
+          this.formattingEditorOpenByRuleId.delete(rule.id);
           await this.plugin.saveSettings();
           this.display();
         }),
@@ -851,7 +896,13 @@ Path: {{filePath}}`;
     const addBlank = new Setting(addRuleWrap)
       .setName('Start from scratch')
       .setDesc('Create an empty rule with sensible defaults you can edit')
-      .addButton((btn) => btn.setButtonText('+ Create blank rule').setClass('mod-cta').onClick(async () => this.addBlankRule()));
+      .addButton((btn) =>
+        btn.setButtonText('+ Create blank rule').setClass('mod-cta').onClick(async () => {
+          await this.addBlankRule();
+          this.advancedEditorOpenByRuleId.clear();
+          this.formattingEditorOpenByRuleId.clear();
+        }),
+      );
     addBlank.settingEl.addClass('ticktick-flow-add-rule-row');
 
     const addDeadlines = new Setting(addRuleWrap)
