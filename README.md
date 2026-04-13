@@ -196,14 +196,16 @@ Tracking/update behavior:
 
 Status sync behavior:
 - Rule setting `Status sync mode` controls mapping from note status property to TickTick open/closed:
-  - `Off` (default): preserve existing completion logic only
-  - `Obsidian status -> TickTick open/closed`: use configurable status mapping
+  - `Off` (default): keep legacy completion mapping
+  - `Obsidian status -> TickTick open/closed`: use your custom status mapping
 - Status mapping options (per rule):
-  - `Status property type`:
-    - `Text/list values` (default)
-    - `Checkbox (true/false)`
-  - `Status values treated as completed` (for text/list)
-  - `Status values treated as open` (for text/list)
+  - `Status property type`: `Text/list values` or `Checkbox`
+  - `Status values treated as completed` (text/list)
+  - `Status values treated as open` (text/list)
+
+Guides/help blocks in settings:
+- Rule guide, preset guide, task content help, and template tokens are now visible in all modes.
+- They are collapsed by default and use shorter beginner-friendly text.
 
 ## Commands
 

@@ -37,6 +37,54 @@
   font-weight: 600;
 }
 
+.ticktick-flow-collapsible {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  margin: 8px 0 12px 0;
+}
+
+.ticktick-flow-collapsible > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ticktick-flow-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ticktick-flow-collapsible-title {
+  font-weight: 600;
+}
+
+.ticktick-flow-collapsible-subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ticktick-flow-collapsible-content {
+  padding: 0 10px 10px 10px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.ticktick-flow-collapsible-content p,
+.ticktick-flow-collapsible-content li {
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.ticktick-flow-collapsible-content ul,
+.ticktick-flow-collapsible-content ol {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
 .ticktick-flow-rule {
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;

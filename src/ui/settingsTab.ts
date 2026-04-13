@@ -43,6 +43,14 @@ function addInfoBlock(containerEl: HTMLElement, title: string): HTMLElement {
   return block;
 }
 
+function addCollapsibleInfoBlock(containerEl: HTMLElement, title: string, subtitle?: string): HTMLElement {
+  const details = containerEl.createEl('details', { cls: 'ticktick-flow-collapsible' });
+  const summary = details.createEl('summary');
+  summary.createEl('span', { text: title, cls: 'ticktick-flow-collapsible-title' });
+  if (subtitle) summary.createEl('span', { text: subtitle, cls: 'ticktick-flow-collapsible-subtitle' });
+  return details.createEl('div', { cls: 'ticktick-flow-collapsible-content' });
+}
+
 function addChecklistBlock(containerEl: HTMLElement, plugin: PluginApi): void {
   const { items, tokenExpiry } = setupChecklist(plugin);
   const block = addInfoBlock(containerEl, 'Setup checklist');
@@ -71,75 +79,67 @@ function addOAuthGuideBlock(containerEl: HTMLElement): void {
 }
 
 function addRulesGuideBlock(containerEl: HTMLElement): void {
-  const block = addInfoBlock(containerEl, 'How rules work');
+  const block = addCollapsibleInfoBlock(containerEl, 'How rules work', 'Short guide');
   const ul = block.createEl('ul');
   [
-    'Obsidian include/exclude tags are MATCHING ONLY (which notes the rule targets).',
-    'TickTick task tags are configured separately in the TickTick tags section.',
-    'Due date uses the first non-empty key in Due fields list (left to right).',
-    'Use one rule per context: Deadlines, Work items, Personal tasks, or General tasks.',
-    'Project target must be explicitly selected for each enabled rule.',
-    'Start with Dry run before real sync.',
+    'Include/exclude tags only choose which notes match the rule.',
+    'TickTick task tags are set separately in the TickTick tags section.',
+    'Due fields are checked left to right; first value wins.',
+    'Each enabled rule needs a selected target project.',
+    'Start with Dry run, then switch it off when results look right.',
   ].forEach((line) => ul.createEl('li', { text: line }));
 }
 
 function addPresetGuideBlock(containerEl: HTMLElement, plugin: PluginApi): void {
-  const block = addInfoBlock(containerEl, 'Preset guide (what each preset does)');
+  const block = addCollapsibleInfoBlock(containerEl, 'Preset guide', 'What each preset starts with');
   const ul = block.createEl('ul');
 
   for (const p of plugin.getBuiltInPresets()) {
     ul.createEl('li', {
-      text: `${p.name}: ${p.description} (tags: ${p.tagsAny.join(', ') || 'none'}; due properties: ${p.dueFields.join(', ')})`,
+      text: `${p.name}: ${p.description}`,
     });
   }
 
   if (plugin.settings.customPresets.length) {
-    block.createEl('p', { text: 'Saved custom presets:' });
+    block.createEl('p', { text: 'Custom presets you saved:' });
     const custom = block.createEl('ul');
     plugin.settings.customPresets.forEach((p) => {
       custom.createEl('li', {
-        text: `${p.name}: ${p.description} (tags: ${p.tagsAny.join(', ') || 'none'}; due properties: ${p.dueFields.join(', ')})`,
+        text: `${p.name}: ${p.description || 'No description'}`,
       });
     });
   }
 }
 
 function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyTokens: boolean): void {
-  const block = addInfoBlock(containerEl, 'Task formatting help');
+  const block = addCollapsibleInfoBlock(containerEl, 'Task content help', 'Short template guide');
   const ul = block.createEl('ul');
   [
-    'Title template sets task title (most important field).',
-    'Content template maps to TickTick task content/body (primary recommended).',
-    'Description template is optional/legacy and may not be visible in all TickTick clients.',
-    'Templates support Markdown text. For links, prefer {{obsidianMdLink}}.',
-    'Prefer content template for details to avoid ambiguity.',
-    'Obsidian links may not open in every TickTick client; desktop/browser support varies.',
-    'Press Enter in template textareas for real line breaks (recommended).',
-    'Literal \\n is also supported and converted automatically.',
-    'Start with a preset, then tweak template text.',
+    'Title = TickTick task title.',
+    'Content = main task text (recommended).',
+    'Description is optional and may be hidden in some TickTick clients.',
+    'Use {{obsidianMdLink}} for a clickable note link.',
+    'Press Enter for line breaks. "\\n" also works.',
   ].forEach((line) => ul.createEl('li', { text: line }));
 
-  const tokenBlock = addInfoBlock(containerEl, 'Template tokens reference');
+  const tokenBlock = addCollapsibleInfoBlock(containerEl, 'Template tokens', 'Fields you can insert into title/content');
   const builtIn = tokenBlock.createEl('ul');
   [
-    '{{noteTitle}} = note filename without .md',
-    '{{filePath}} = full vault-relative note path',
-    '{{class}} = class field value from note properties',
-    '{{obsidianLink}} = raw obsidian:// URL (device/client support varies)',
-    '{{obsidianMdLink}} = Markdown link to obsidian:// URL (recommended in content/desc)',
-    '{{ruleName}} = current rule name',
-    '{{dueRaw}} = raw due property value',
-    '{{duePretty}} = formatted due date/time',
-    '{{status}} = status property value',
-    '{{tags}} = note tags as comma-separated text',
-    '{{projectName}} = selected TickTick project name',
+    '{{noteTitle}} note filename',
+    '{{filePath}} note path',
+    '{{obsidianMdLink}} markdown link to note',
+    '{{ruleName}} current rule',
+    '{{duePretty}} formatted due date',
+    '{{status}} status field value',
+    '{{tags}} note tags text',
+    '{{projectName}} selected project',
   ].forEach((line) => builtIn.createEl('li', { text: line }));
 
   const custom = tokenBlock.createEl('p');
   custom.setText(
     allowAllPropertyTokens
-      ? 'Custom property tokens are enabled: you can use any note property as {{propertyName}} (example: {{priority}}, {{teacher}}).'
-      : 'Custom property tokens are disabled: only built-in tokens above will resolve. Enable "Template token mode" in global settings to allow any {{propertyName}} token.',
+      ? 'Custom tokens are enabled: use any note property as {{propertyName}}.'
+      : 'Custom tokens are off: only the built-in tokens above will resolve.',
   );
 }
 
@@ -610,7 +610,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     if (showFormatting) {
-      if (!this.plugin.settings.simpleMode) addFormattingGuideBlock(containerEl, this.plugin.settings.allowAllPropertyTokens);
+      addFormattingGuideBlock(containerEl, this.plugin.settings.allowAllPropertyTokens);
 
       new Setting(containerEl)
         .setName('Formatting presets')
@@ -1076,7 +1076,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         this.activePane = 'rules';
         this.display();
       });
-    } else if (!this.plugin.settings.simpleMode) {
+    } else {
       addRulesGuideBlock(containerEl);
     }
 
@@ -1120,9 +1120,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       .addButton((btn) => btn.setButtonText('+ Add General tasks rule').onClick(async () => this.addRuleFromPreset('general-tasks')));
     addGeneral.settingEl.addClass('ticktick-flow-add-rule-row');
 
-    if (!this.plugin.settings.simpleMode) {
-      addPresetGuideBlock(containerEl, this.plugin);
-    }
+    addPresetGuideBlock(containerEl, this.plugin);
 
     if (this.plugin.settings.customPresets.length > 0) {
       const customWrap = containerEl.createEl('div', { cls: 'ticktick-flow-preset-manager' });
