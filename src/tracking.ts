@@ -11,10 +11,18 @@ function ruleScopedKey(candidate: SyncCandidate): string {
 
 async function readTrackingMap(app: App, settings: TickTickUniversitySyncSettings): Promise<TrackingMap> {
   const path = resolveTrackingPath(settings);
-  const file = app.vault.getAbstractFileByPath(path);
-  if (!file) return {};
+  const adapter = app.vault.adapter;
 
-  const content = await app.vault.read(file as never);
+  const exists = await adapter.exists(path);
+  if (!exists) return {};
+
+  let content = '';
+  try {
+    content = await adapter.read(path);
+  } catch {
+    return {};
+  }
+
   if (!content.trim()) return {};
 
   try {
@@ -27,16 +35,17 @@ async function readTrackingMap(app: App, settings: TickTickUniversitySyncSetting
 
 async function ensureFolderPath(app: App, folderPath: string): Promise<void> {
   if (!folderPath) return;
+  const adapter = app.vault.adapter;
   const parts = folderPath.split('/').filter(Boolean);
   let current = '';
+
   for (const part of parts) {
     current = current ? `${current}/${part}` : part;
-    if (!app.vault.getAbstractFileByPath(current)) {
-      try {
-        await app.vault.createFolder(current);
-      } catch {
-        // another sync/process may have created it meanwhile
-      }
+    try {
+      const exists = await adapter.exists(current);
+      if (!exists) await adapter.mkdir(current);
+    } catch {
+      // already created by another process or path race
     }
   }
 }
@@ -45,30 +54,12 @@ async function writeTrackingMap(app: App, settings: TickTickUniversitySyncSettin
   const path = resolveTrackingPath(settings);
   const content = JSON.stringify(map, null, 2);
 
-  const existing = app.vault.getAbstractFileByPath(path);
-  if (existing) {
-    await app.vault.modify(existing as never, content);
-    return;
-  }
-
   const parts = path.split('/');
   parts.pop();
   const folder = parts.join('/');
   await ensureFolderPath(app, folder);
 
-  try {
-    await app.vault.create(path, content);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.toLowerCase().includes('already exists')) {
-      const again = app.vault.getAbstractFileByPath(path);
-      if (again) {
-        await app.vault.modify(again as never, content);
-        return;
-      }
-    }
-    throw e;
-  }
+  await app.vault.adapter.write(path, content);
 }
 
 export async function getTrackingForCandidate(
