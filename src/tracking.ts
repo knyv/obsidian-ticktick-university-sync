@@ -25,21 +25,49 @@ async function readTrackingMap(app: App, settings: TickTickUniversitySyncSetting
   }
 }
 
+async function ensureFolderPath(app: App, folderPath: string): Promise<void> {
+  if (!folderPath) return;
+  const parts = folderPath.split('/').filter(Boolean);
+  let current = '';
+  for (const part of parts) {
+    current = current ? `${current}/${part}` : part;
+    if (!app.vault.getAbstractFileByPath(current)) {
+      try {
+        await app.vault.createFolder(current);
+      } catch {
+        // another sync/process may have created it meanwhile
+      }
+    }
+  }
+}
+
 async function writeTrackingMap(app: App, settings: TickTickUniversitySyncSettings, map: TrackingMap): Promise<void> {
   const path = resolveTrackingPath(settings);
-  const file = app.vault.getAbstractFileByPath(path);
   const content = JSON.stringify(map, null, 2);
 
-  if (file) {
-    await app.vault.modify(file as never, content);
-  } else {
-    const parts = path.split('/');
-    parts.pop();
-    const folder = parts.join('/');
-    if (folder) {
-      await app.vault.createFolder(folder).catch(() => undefined);
-    }
+  const existing = app.vault.getAbstractFileByPath(path);
+  if (existing) {
+    await app.vault.modify(existing as never, content);
+    return;
+  }
+
+  const parts = path.split('/');
+  parts.pop();
+  const folder = parts.join('/');
+  await ensureFolderPath(app, folder);
+
+  try {
     await app.vault.create(path, content);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.toLowerCase().includes('already exists')) {
+      const again = app.vault.getAbstractFileByPath(path);
+      if (again) {
+        await app.vault.modify(again as never, content);
+        return;
+      }
+    }
+    throw e;
   }
 }
 
