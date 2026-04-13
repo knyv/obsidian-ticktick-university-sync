@@ -382,11 +382,14 @@ export async function runSync(
   summary.scanned = candidates.length;
 
   for (const candidate of candidates) {
+    let phase = 'init';
     try {
       const statusCode = resolveTaskStatusCode(candidate);
       const completed = statusCode === 2;
+      phase = 'resolve-project';
       const project = await ensureRuleProject(client, candidate.rule);
 
+      phase = 'read-tracking';
       const tracked = await tracking.read(candidate);
       const existingRef = pickExistingTaskRef(candidate, tracked, settings.trackingMode);
       const effectiveTaskId = existingRef?.taskId;
@@ -412,6 +415,7 @@ export async function runSync(
       let verifiedProjectId = effectiveProjectId;
       if (effectiveTaskId && effectiveProjectId) {
         try {
+          phase = 'verify-existing';
           const remote = await client.getTask(effectiveProjectId, effectiveTaskId);
           if (!sameTaskByContent(candidate, remote)) {
             verifiedTaskId = undefined;
@@ -423,6 +427,7 @@ export async function runSync(
 
       if (!verifiedTaskId) {
         try {
+          phase = 'heuristic-relink';
           const tasks = await client.listProjectTasks(project.id);
           const found = findExistingTaskByHeuristic(candidate, tasks);
           if (found?.taskId) {
@@ -448,30 +453,37 @@ export async function runSync(
         continue;
       }
 
+      // From this point onward, any thrown error means write pipeline failed for this candidate.
+
       let currentTaskId = verifiedTaskId;
       let currentProjectId = verifiedProjectId;
 
       if (!currentTaskId) {
+        phase = 'create-task';
         const created = await client.createTask(payload);
         currentTaskId = created.id;
         currentProjectId = created.projectId || verifiedProjectId;
         summary.created += 1;
       } else if (candidate.rule.syncMode === 'upsert') {
+        phase = 'update-task';
         const updated = await client.updateTask(currentTaskId, payload);
         currentProjectId = updated.projectId || verifiedProjectId;
         summary.updated += 1;
       }
 
       if (completed && currentTaskId && candidate.rule.markCompletedInTickTick) {
+        phase = 'complete-task';
         await client.completeTask(currentProjectId, currentTaskId);
         summary.completed += 1;
       }
 
       if (currentTaskId) {
         if (settings.trackingMode === 'frontmatter') {
+          phase = 'write-frontmatter';
           await updateFrontmatterTracking(app, candidate, currentTaskId, currentProjectId);
         }
 
+        phase = 'write-tracking';
         await tracking.write(candidate, {
           taskId: currentTaskId,
           projectId: currentProjectId,
@@ -481,7 +493,7 @@ export async function runSync(
       summary.synced += 1;
     } catch (e) {
       summary.failed += 1;
-      failures.push(`${candidate.file.path}: ${e instanceof Error ? e.message : String(e)}`);
+      failures.push(`${candidate.file.path} [${phase}]: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 

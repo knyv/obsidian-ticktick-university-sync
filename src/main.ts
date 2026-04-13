@@ -505,6 +505,8 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
       if (failures.length) {
         console.error('[TickTick Flow Sync] Failures:', failures);
+        const preview = failures.slice(0, 3).join(' | ');
+        new Notice(`Sync failures (${failures.length}): ${preview}${failures.length > 3 ? ' ...check console for full list' : ''}`, 10000);
       }
     } catch (e) {
       console.error('[TickTick Flow Sync] Fatal sync error:', e);
