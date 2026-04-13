@@ -76,17 +76,19 @@ function addRulesGuideBlock(containerEl: HTMLElement): void {
     'A note matches when it has ANY include tag and NONE of the exclude tags.',
     'Due date uses the first non-empty key in Due fields list (left to right).',
     'Use one rule per context: University, Work, Personal.',
+    'Each rule is grouped into: Match notes -> Project target -> Sync behavior -> Task formatting.',
     'Start with Dry run before real sync.',
   ].forEach((line) => ul.createEl('li', { text: line }));
 }
 
 function addFormattingGuideBlock(containerEl: HTMLElement): void {
-  const block = addInfoBlock(containerEl, 'Formatting templates');
+  const block = addInfoBlock(containerEl, 'Task formatting help');
   const ul = block.createEl('ul');
   [
     'Title/content/description are optional templates sent to TickTick.',
     'Tokens supported: {{noteTitle}}, {{duePretty}}, {{class}}, {{obsidianLink}}, etc.',
-    'For line breaks, type \\n in the template text.',
+    'Press Enter in the text box for real line breaks (recommended).',
+    'Literal \\n is also supported and converted automatically.',
     'Use preset buttons first, then tweak.',
   ].forEach((line) => ul.createEl('li', { text: line }));
 }
@@ -142,6 +144,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
   private renderRule(containerEl: HTMLElement, rule: SyncRule, idx: number) {
     containerEl.createEl('h4', { text: `Rule ${idx + 1}: ${rule.name}` });
+    containerEl.createEl('h5', { text: 'A) Match notes' });
 
     new Setting(containerEl)
       .setName('Rule name')
@@ -189,6 +192,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
+    containerEl.createEl('h5', { text: 'B) Project target' });
+
     new Setting(containerEl)
       .setName('Target project (dropdown)')
       .setDesc('Click "Load project list" in Account Setup first, then select here.')
@@ -212,6 +217,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           }
         }),
       );
+
+    containerEl.createEl('h5', { text: 'C) Sync behavior' });
 
     new Setting(containerEl)
       .setName('Sync mode')
@@ -237,6 +244,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
+    containerEl.createEl('h5', { text: 'D) Task formatting' });
     addFormattingGuideBlock(containerEl);
 
     new Setting(containerEl)
@@ -272,6 +280,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Task content template')
+      .setDesc('Multi-line supported: press Enter for line breaks. \\n also works.')
       .addTextArea((text) =>
         text.setValue(rule.contentTemplate).onChange(async (value) => {
           rule.contentTemplate = value || 'Source: [{{noteTitle}}]({{obsidianLink}})';
@@ -281,6 +290,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Task description template')
+      .setDesc('Multi-line supported: press Enter for line breaks. \\n also works.')
       .addTextArea((text) =>
         text.setValue(rule.descTemplate || '').onChange(async (value) => {
           rule.descTemplate = value || '';

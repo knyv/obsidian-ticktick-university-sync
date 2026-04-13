@@ -108,10 +108,12 @@ function buildTaskPayload(
   const title = renderTemplate(candidate.rule.titleTemplate, tokens).trim();
 
   const content = renderTemplate(candidate.rule.contentTemplate, tokens)
+    .replace(/\r\n/g, '\n')
     .replace(/\\n/g, '\n')
     .trim();
 
   const desc = renderTemplate(candidate.rule.descTemplate || '', tokens)
+    .replace(/\r\n/g, '\n')
     .replace(/\\n/g, '\n')
     .trim();
 
