@@ -3,6 +3,17 @@ import { TFile } from 'obsidian';
 export type SyncMode = 'upsert' | 'create_only';
 export type TrackingMode = 'frontmatter' | 'local_json';
 
+export interface CustomRulePreset {
+  id: string;
+  name: string;
+  description: string;
+  tagsAny: string[];
+  excludeTagsAny: string[];
+  dueFields: string[];
+  targetProjectName: string;
+  syncMode: SyncMode;
+}
+
 export interface SyncRule {
   id: string;
   name: string;
@@ -60,6 +71,7 @@ export interface TickTickUniversitySyncSettings {
   trackingMode: TrackingMode;
   localTrackingFile: string;
   allowAllPropertyTokens: boolean;
+  customPresets: CustomRulePreset[];
 
   rules: SyncRule[];
 }

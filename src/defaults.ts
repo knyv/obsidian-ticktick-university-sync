@@ -1,5 +1,5 @@
 import { DEFAULT_REDIRECT_URI, DEFAULT_SCOPES } from './constants';
-import { LegacySettings, SyncRule, TickTickUniversitySyncSettings } from './types';
+import { CustomRulePreset, LegacySettings, SyncRule, TickTickUniversitySyncSettings } from './types';
 import { makeRuleId } from './utils';
 
 export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule {
@@ -55,9 +55,43 @@ export const DEFAULT_SETTINGS: TickTickUniversitySyncSettings = {
   trackingMode: 'frontmatter',
   localTrackingFile: '.obsidian/plugins/ticktick-flow-sync/tracking.json',
   allowAllPropertyTokens: true,
+  customPresets: [],
 
   rules: [makeUniversityRule()],
 };
+
+export const BUILTIN_PRESETS: CustomRulePreset[] = [
+  {
+    id: 'deadlines',
+    name: 'Deadlines',
+    description: 'For due-based notes like assignments/exams using deadline tags and due properties.',
+    tagsAny: ['university/assignments', 'university/exams'],
+    excludeTagsAny: [],
+    dueFields: ['due', 'deadline', 'exam_date'],
+    targetProjectName: 'University',
+    syncMode: 'upsert',
+  },
+  {
+    id: 'personal-tasks',
+    name: 'Personal tasks',
+    description: 'For personal todos tagged under tasks/personal.',
+    tagsAny: ['tasks/personal'],
+    excludeTagsAny: [],
+    dueFields: ['due', 'deadline'],
+    targetProjectName: 'Inbox',
+    syncMode: 'upsert',
+  },
+  {
+    id: 'work-items',
+    name: 'Work items',
+    description: 'For work-related items tagged under tasks/work.',
+    tagsAny: ['tasks/work'],
+    excludeTagsAny: [],
+    dueFields: ['due', 'deadline'],
+    targetProjectName: 'Work',
+    syncMode: 'upsert',
+  },
+];
 
 export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
   const data = (raw ?? {}) as LegacySettings;
@@ -108,6 +142,9 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
   }
   if (typeof merged.allowAllPropertyTokens !== 'boolean') {
     merged.allowAllPropertyTokens = true;
+  }
+  if (!Array.isArray(merged.customPresets)) {
+    merged.customPresets = [];
   }
   if (merged.localTrackingFile.trim() === '.obsidian/plugins/ticktick-university-sync/tracking.json') {
     merged.localTrackingFile = '.obsidian/plugins/ticktick-flow-sync/tracking.json';

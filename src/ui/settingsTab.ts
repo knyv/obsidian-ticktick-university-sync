@@ -1,7 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import { makeUniversityRule } from '../defaults';
 import { PluginApi } from '../pluginApi';
-import { SyncRule, TickTickProject, TrackingMode } from '../types';
+import { CustomRulePreset, SyncRule, TickTickProject, TrackingMode } from '../types';
 import { makeRuleId } from '../utils';
 import { AuthCodeModal } from './authCodeModal';
 
@@ -58,7 +58,7 @@ function addOAuthGuideBlock(containerEl: HTMLElement): void {
   [
     'Open TickTick Developer Apps.',
     'Create/select an app and set Redirect URI to EXACTLY: https://localhost/',
-    'Copy Client ID + Client Secret into this page.',
+    'Copy Client ID + Client Secret into Obsidian (this settings page).',
     'Open OAuth URL and approve access in browser.',
     'Copy final redirect URL from browser address bar.',
     'Exchange from Clipboard (fastest) or use Manual Exchange.',
@@ -79,6 +79,27 @@ function addRulesGuideBlock(containerEl: HTMLElement): void {
     'Each rule is grouped into: Match notes -> Project target -> Sync behavior -> Task formatting.',
     'Start with Dry run before real sync.',
   ].forEach((line) => ul.createEl('li', { text: line }));
+}
+
+function addPresetGuideBlock(containerEl: HTMLElement, plugin: PluginApi): void {
+  const block = addInfoBlock(containerEl, 'Preset guide (what each preset does)');
+  const ul = block.createEl('ul');
+
+  for (const p of plugin.getBuiltInPresets()) {
+    ul.createEl('li', {
+      text: `${p.name}: ${p.description} (tags: ${p.tagsAny.join(', ') || 'none'}; due properties: ${p.dueFields.join(', ')})`,
+    });
+  }
+
+  if (plugin.settings.customPresets.length) {
+    block.createEl('p', { text: 'Saved custom presets:' });
+    const custom = block.createEl('ul');
+    plugin.settings.customPresets.forEach((p) => {
+      custom.createEl('li', {
+        text: `${p.name}: ${p.description} (tags: ${p.tagsAny.join(', ') || 'none'}; due properties: ${p.dueFields.join(', ')})`,
+      });
+    });
+  }
 }
 
 function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyTokens: boolean): void {
@@ -118,43 +139,46 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   plugin: PluginApi;
   private projects: TickTickProject[] = [];
   private showAdvanced = false;
+  private presetRuleIndexInput = '';
+  private presetNameInput = '';
+  private presetDescriptionInput = '';
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
     this.plugin = plugin;
   }
 
-  private async addRuleFromPreset(preset: 'academic-deadlines' | 'personal-tasks' | 'work-items') {
+  private async addRuleFromPreset(preset: 'deadlines' | 'personal-tasks' | 'work-items' | 'custom') {
     let rule: SyncRule;
-    if (preset === 'academic-deadlines') {
-      rule = makeUniversityRule({
-        id: makeRuleId('academic-deadlines'),
-        name: 'Deadlines',
-        tagsAny: ['university/assignments', 'university/exams'],
-        dueFields: ['due', 'deadline', 'exam_date'],
-        targetProjectName: 'University',
-      });
-    } else if (preset === 'personal-tasks') {
-      rule = makeUniversityRule({
-        id: makeRuleId('personal-tasks'),
-        name: 'Personal tasks',
-        tagsAny: ['tasks/personal'],
-        dueFields: ['due', 'deadline'],
-        targetProjectName: 'Inbox',
-      });
+
+    if (preset === 'custom') {
+      const custom = this.plugin.settings.customPresets[0];
+      if (!custom) {
+        new Notice('No custom presets yet. Save one first.');
+        return;
+      }
+      rule = this.ruleFromPreset(custom);
     } else {
-      rule = makeUniversityRule({
-        id: makeRuleId('work-items'),
-        name: 'Work items',
-        tagsAny: ['tasks/work'],
-        dueFields: ['due', 'deadline'],
-        targetProjectName: 'Work',
-      });
+      const builtIn = this.plugin.getBuiltInPresets().find((p) => p.id === preset);
+      if (!builtIn) throw new Error(`Preset not found: ${preset}`);
+      rule = this.ruleFromPreset(builtIn);
     }
 
     this.plugin.settings.rules.push(rule);
     await this.plugin.saveSettings();
     this.display();
+  }
+
+  private ruleFromPreset(preset: CustomRulePreset): SyncRule {
+    return makeUniversityRule({
+      id: makeRuleId(preset.id),
+      name: preset.name,
+      tagsAny: [...preset.tagsAny],
+      excludeTagsAny: [...preset.excludeTagsAny],
+      dueFields: [...preset.dueFields],
+      targetProjectName: preset.targetProjectName,
+      syncMode: preset.syncMode,
+    });
   }
 
   private projectDropdownOptions(rule: SyncRule): Record<string, string> {
@@ -427,6 +451,8 @@ Rule: {{ruleName}}`;
       .setDesc('Removes this rule completely.')
       .addButton((btn) =>
         btn.setWarning().setButtonText('Delete').onClick(async () => {
+          const ok = window.confirm(`Delete rule "${rule.name}"? This cannot be undone.`);
+          if (!ok) return;
           this.plugin.settings.rules = this.plugin.settings.rules.filter((r) => r.id !== rule.id);
           await this.plugin.saveSettings();
           this.display();
@@ -514,7 +540,7 @@ Rule: {{ruleName}}`;
       )
       .settingEl.addClass('ticktick-flow-action-row');
 
-    const oauthStep2 = new Setting(oauthWrap).setName('Beginner path: step 2').setDesc('Open OAuth consent page in browser');
+    const oauthStep2 = new Setting(oauthWrap).setName('Beginner path: step 4').setDesc('Open OAuth consent page in browser');
     oauthStep2
       .addButton((btn) =>
         btn.setButtonText('Open OAuth URL').onClick(() => {
@@ -523,7 +549,7 @@ Rule: {{ruleName}}`;
       )
       .settingEl.addClass('ticktick-flow-action-row');
 
-    const oauthStep3 = new Setting(oauthWrap).setName('Beginner path: step 3').setDesc('Exchange redirect URL/code from clipboard');
+    const oauthStep3 = new Setting(oauthWrap).setName('Beginner path: step 6').setDesc('Exchange redirect URL/code from clipboard');
     oauthStep3
       .addButton((btn) =>
         btn.setButtonText('Exchange from Clipboard').onClick(async () => {
@@ -550,22 +576,22 @@ Rule: {{ruleName}}`;
       .settingEl.addClass('ticktick-flow-action-row');
 
     new Setting(containerEl)
-      .setName('Connection checks')
-      .setDesc('Use these to verify login and load project dropdown data')
+      .setName('Connection & projects')
+      .setDesc('Recommended: click "Load + test + prefill projects" first')
       .addButton((btn) =>
-        btn.setButtonText('Test API connection').onClick(async () => {
+        btn.setButtonText('Load + test + prefill projects').setClass('mod-cta').onClick(async () => {
           try {
             await this.plugin.testConnection();
-          } catch (e) {
-            new Notice(e instanceof Error ? e.message : String(e));
-          }
-        }),
-      )
-      .addButton((btn) =>
-        btn.setButtonText('Load project list').onClick(async () => {
-          try {
+            await this.plugin.preloadProjects();
+
+            for (const rule of this.plugin.settings.rules) {
+              if (!rule.targetProjectId) {
+                await this.plugin.discoverAndSelectProject(rule.id);
+              }
+            }
+
             this.projects = await this.plugin.listProjects();
-            new Notice(`Loaded ${this.projects.length} projects.`);
+            new Notice(`Ready: loaded ${this.projects.length} projects and prefilled missing rule project targets.`);
             this.display();
           } catch (e) {
             new Notice(e instanceof Error ? e.message : String(e));
@@ -577,6 +603,17 @@ Rule: {{ruleName}}`;
           try {
             await this.plugin.refreshAccessToken();
             new Notice('Token refreshed.');
+            this.display();
+          } catch (e) {
+            new Notice(e instanceof Error ? e.message : String(e));
+          }
+        }),
+      )
+      .addButton((btn) =>
+        btn.setButtonText('Manual: load project list').onClick(async () => {
+          try {
+            this.projects = await this.plugin.listProjects();
+            new Notice(`Loaded ${this.projects.length} projects.`);
             this.display();
           } catch (e) {
             new Notice(e instanceof Error ? e.message : String(e));
@@ -677,7 +714,7 @@ Rule: {{ruleName}}`;
       .setDesc('Choose based on what the rule does')
       .addButton((btn) =>
         btn.setButtonText('Deadlines').onClick(async () => {
-          await this.addRuleFromPreset('academic-deadlines');
+          await this.addRuleFromPreset('deadlines');
         }),
       )
       .addButton((btn) =>
@@ -689,7 +726,64 @@ Rule: {{ruleName}}`;
         btn.setButtonText('Work items').onClick(async () => {
           await this.addRuleFromPreset('work-items');
         }),
+      )
+      .addButton((btn) =>
+        btn.setButtonText('First custom preset').onClick(async () => {
+          await this.addRuleFromPreset('custom');
+        }),
       );
+
+    addPresetGuideBlock(containerEl, this.plugin);
+
+    if (this.plugin.settings.rules.length > 0) {
+      new Setting(containerEl)
+        .setName('Save current rule as custom preset')
+        .setDesc('Pick a rule by index, then save reusable preset settings')
+        .addText((text) =>
+          text
+            .setPlaceholder(`rule index, 1-${this.plugin.settings.rules.length}`)
+            .setValue(this.presetRuleIndexInput)
+            .onChange((value) => {
+              this.presetRuleIndexInput = value;
+            }),
+        )
+        .addText((text) =>
+          text
+            .setPlaceholder('preset name')
+            .setValue(this.presetNameInput)
+            .onChange((value) => {
+              this.presetNameInput = value;
+            }),
+        )
+        .addText((text) =>
+          text
+            .setPlaceholder('preset description')
+            .setValue(this.presetDescriptionInput)
+            .onChange((value) => {
+              this.presetDescriptionInput = value;
+            }),
+        )
+        .addButton((btn) =>
+          btn.setButtonText('Save preset').onClick(async () => {
+            const idxRaw = this.presetRuleIndexInput.trim() || '1';
+            const name = this.presetNameInput.trim() || 'Custom preset';
+            const description = this.presetDescriptionInput.trim() || 'Custom preset from current rule';
+
+            const idx = Number(idxRaw) - 1;
+            if (!Number.isFinite(idx) || idx < 0 || idx >= this.plugin.settings.rules.length) {
+              new Notice(`Invalid rule index. Use 1-${this.plugin.settings.rules.length}.`);
+              return;
+            }
+
+            await this.plugin.createCustomPresetFromRule(this.plugin.settings.rules[idx].id, name, description);
+            this.presetRuleIndexInput = '';
+            this.presetNameInput = '';
+            this.presetDescriptionInput = '';
+            this.display();
+          }),
+        );
+    }
+
 
     new Setting(containerEl)
       .setName('Advanced mode')

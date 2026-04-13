@@ -128,10 +128,11 @@ Optional:
 
 ## Commands
 
-- Sync deadlines to TickTick now
-- Open TickTick OAuth authorization URL
-- Open TickTick Developer Apps page
-- Exchange TickTick auth code/URL
-- Exchange TickTick auth from clipboard
-- Test TickTick API connection
-- Discover TickTick projects and auto-select target
+- Sync notes to TickTick now
+- Beginner path: open TickTick Developer Apps (step 1)
+- Beginner path: open TickTick OAuth URL (step 4)
+- Beginner path: exchange auth from clipboard (step 6)
+- Beginner path: exchange auth code/URL (manual alt)
+- Connection check: test TickTick API
+- Projects: load TickTick project list
+- Projects: auto-select target project for first rule

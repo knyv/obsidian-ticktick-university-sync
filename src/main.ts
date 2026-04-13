@@ -1,6 +1,6 @@
 import { Notice, Plugin } from 'obsidian';
 import { DEFAULT_SCOPES, TICKTICK_DEVELOPER_APPS_URL } from './constants';
-import { DEFAULT_SETTINGS, migrateSettings } from './defaults';
+import { BUILTIN_PRESETS, DEFAULT_SETTINGS, migrateSettings } from './defaults';
 import { exchangeCodeForToken, buildOAuthAuthorizeUrl, refreshToken } from './oauth';
 import { PluginApi } from './pluginApi';
 import { runSync } from './sync';
@@ -14,6 +14,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   settings: TickTickUniversitySyncSettings = DEFAULT_SETTINGS;
   private syncTimer: number | null = null;
   private client!: TickTickClient;
+  private cachedProjects: { id: string; name: string; closed?: number }[] = [];
 
   async onload() {
     await this.loadSettings();
@@ -32,7 +33,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-sync-now',
-      name: 'Sync deadlines to TickTick now',
+      name: 'Sync notes to TickTick now',
       callback: async () => {
         await this.syncNow();
       },
@@ -40,7 +41,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-open-auth-url',
-      name: 'Open TickTick OAuth authorization URL',
+      name: 'Beginner path: open TickTick OAuth URL (step 4)',
       callback: async () => {
         this.openOAuthUrl();
       },
@@ -48,7 +49,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-open-developer-apps',
-      name: 'Open TickTick Developer Apps page',
+      name: 'Beginner path: open TickTick Developer Apps (step 1)',
       callback: async () => {
         this.openTickTickDeveloperPage();
       },
@@ -56,7 +57,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-exchange-auth-code',
-      name: 'Exchange TickTick auth code/URL',
+      name: 'Beginner path: exchange auth code/URL (manual alt)',
       callback: async () => {
         new AuthCodeModal(this.app, async (input) => {
           await this.exchangeAuthCode(input);
@@ -66,7 +67,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-exchange-auth-from-clipboard',
-      name: 'Exchange TickTick auth from clipboard',
+      name: 'Beginner path: exchange auth from clipboard (step 6)',
       callback: async () => {
         await this.exchangeAuthCodeFromClipboard();
       },
@@ -74,7 +75,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-test-connection',
-      name: 'Test TickTick API connection',
+      name: 'Connection check: test TickTick API',
       callback: async () => {
         await this.testConnection();
       },
@@ -82,9 +83,17 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     this.addCommand({
       id: 'ticktick-flow-discover-projects',
-      name: 'Discover TickTick projects and auto-select target',
+      name: 'Projects: auto-select target project for first rule',
       callback: async () => {
         await this.discoverAndSelectProject();
+      },
+    });
+
+    this.addCommand({
+      id: 'ticktick-flow-load-projects',
+      name: 'Projects: load TickTick project list',
+      callback: async () => {
+        await this.preloadProjects();
       },
     });
 
@@ -94,7 +103,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     if (this.settings.syncOnStartup) {
       this.syncNow().catch((e) => {
-        console.error('[TickTick Deadline Sync] Startup sync failed:', e);
+        console.error('[TickTick Flow Sync] Startup sync failed:', e);
       });
     }
   }
@@ -128,7 +137,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
         try {
           await this.syncNow();
         } catch (e) {
-          console.error('[TickTick Deadline Sync] Auto-sync error:', e);
+          console.error('[TickTick Flow Sync] Auto-sync error:', e);
         }
       }, mins * 60 * 1000);
     }
@@ -213,7 +222,18 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   }
 
   async listProjects() {
-    return this.client.listProjects();
+    if (this.cachedProjects.length) {
+      return this.cachedProjects;
+    }
+    const projects = await this.client.listProjects();
+    this.cachedProjects = projects;
+    return projects;
+  }
+
+  async preloadProjects() {
+    const projects = await this.client.listProjects();
+    this.cachedProjects = projects;
+    new Notice(`Loaded ${projects.length} TickTick projects.`);
   }
 
   async discoverAndSelectProject(ruleId?: string) {
@@ -262,8 +282,31 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   }
 
   async testConnection() {
-    const projects = await this.listProjects();
+    const projects = await this.client.listProjects();
+    this.cachedProjects = projects;
     new Notice(`TickTick connected. Projects: ${projects.length}`);
+  }
+
+  getBuiltInPresets() {
+    return BUILTIN_PRESETS;
+  }
+
+  async createCustomPresetFromRule(ruleId: string, name: string, description: string) {
+    const rule = this.settings.rules.find((r) => r.id === ruleId);
+    if (!rule) throw new Error(`Rule not found: ${ruleId}`);
+
+    this.settings.customPresets.push({
+      id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+      name: name.trim() || `Preset from ${rule.name}`,
+      description: description.trim() || `Custom preset generated from rule '${rule.name}'.`,
+      tagsAny: [...rule.tagsAny],
+      excludeTagsAny: [...rule.excludeTagsAny],
+      dueFields: [...rule.dueFields],
+      targetProjectName: rule.targetProjectName,
+      syncMode: rule.syncMode,
+    });
+    await this.saveSettings();
+    new Notice('Custom preset saved.');
   }
 
   async syncNow() {
@@ -288,10 +331,10 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       );
 
       if (failures.length) {
-        console.error('[TickTick Deadline Sync] Failures:', failures);
+        console.error('[TickTick Flow Sync] Failures:', failures);
       }
     } catch (e) {
-      console.error('[TickTick Deadline Sync] Fatal sync error:', e);
+      console.error('[TickTick Flow Sync] Fatal sync error:', e);
       new Notice(`TickTick sync failed: ${e instanceof Error ? e.message : String(e)}`, 10000);
       throw e;
     }

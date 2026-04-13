@@ -1,5 +1,5 @@
 import { App } from 'obsidian';
-import { TickTickProject, TickTickUniversitySyncSettings } from './types';
+import { CustomRulePreset, TickTickProject, TickTickUniversitySyncSettings } from './types';
 
 export interface PluginApi {
   app: App;
@@ -8,10 +8,13 @@ export interface PluginApi {
   syncNow: () => Promise<void>;
   testConnection: () => Promise<void>;
   listProjects: () => Promise<TickTickProject[]>;
+  preloadProjects: () => Promise<void>;
   openTickTickDeveloperPage: () => void;
   openOAuthUrl: () => void;
   exchangeAuthCode: (input: string) => Promise<void>;
   exchangeAuthCodeFromClipboard: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
   discoverAndSelectProject: (ruleId?: string) => Promise<void>;
+  getBuiltInPresets: () => CustomRulePreset[];
+  createCustomPresetFromRule: (ruleId: string, name: string, description: string) => Promise<void>;
 }
