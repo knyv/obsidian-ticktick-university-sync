@@ -197,6 +197,10 @@ Tracking/update behavior:
 - Added command: `Tracking: link note to existing TickTick task` for explicit manual repair.
 
 Status sync behavior:
+- Completed-note creation behavior:
+  - `Create completed tasks when missing in TickTick` is ON by default.
+  - If OFF, completed notes without an existing task link are skipped.
+
 - Rule setting `Status sync mode` controls mapping from note status property to TickTick open/closed:
   - `Off` (default): keep legacy completion mapping
   - `Obsidian status -> TickTick open/closed`: use your custom status mapping

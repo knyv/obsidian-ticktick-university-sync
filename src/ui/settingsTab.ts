@@ -784,7 +784,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName('Include completed notes without existing task ID')
+        .setName('Create completed tasks when missing in TickTick')
+        .setDesc('Recommended ON. If OFF, completed notes are skipped unless already linked to a TickTick task.')
         .addToggle((toggle) =>
           toggle.setValue(rule.includeCompletedWithoutTaskId).onChange(async (value) => {
             rule.includeCompletedWithoutTaskId = value;
