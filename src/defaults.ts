@@ -20,10 +20,12 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     includeCompletedWithoutTaskId: false,
     markCompletedInTickTick: true,
     syncMode: 'upsert',
+    candidateSelectionMode: 'all',
+    dueWindowMode: 'all',
     completedKeywords: ['completed', 'complete', 'done', 'finished'],
     titleTemplate: '{{noteTitle}}',
     contentTemplate: ``,
-    descTemplate: `Open note: {{obsidianLink}}
+    descTemplate: `Open note: {{obsidianMdLink}}
 Path: {{filePath}}`,
     ticktickTagsField: 'ticktick_tags',
     tagSourceMode: 'all_note_tags',
@@ -130,6 +132,14 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       Array.isArray(rule.completedKeywords) && rule.completedKeywords.length
         ? rule.completedKeywords
         : ['completed', 'complete', 'done', 'finished'],
+    candidateSelectionMode:
+      rule.candidateSelectionMode === 'new_only' || rule.candidateSelectionMode === 'existing_only'
+        ? rule.candidateSelectionMode
+        : 'all',
+    dueWindowMode:
+      rule.dueWindowMode === 'overdue_only' || rule.dueWindowMode === 'not_overdue_only'
+        ? rule.dueWindowMode
+        : 'all',
     ticktickTagsField: typeof rule.ticktickTagsField === 'string' && rule.ticktickTagsField.trim()
       ? rule.ticktickTagsField
       : 'ticktick_tags',
@@ -161,7 +171,7 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       typeof (rule as { descTemplate?: unknown }).descTemplate === 'string' &&
       String((rule as { descTemplate?: unknown }).descTemplate).trim()
         ? String((rule as { descTemplate?: unknown }).descTemplate)
-        : `Open note: {{obsidianLink}}
+        : `Open note: {{obsidianMdLink}}
 Path: {{filePath}}`,
   }));
 

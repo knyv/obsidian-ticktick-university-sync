@@ -3,6 +3,8 @@ import { TFile } from 'obsidian';
 export type SyncMode = 'upsert' | 'create_only';
 export type TrackingMode = 'frontmatter' | 'local_json';
 export type TagSourceMode = 'all_note_tags' | 'include_tags';
+export type CandidateSelectionMode = 'all' | 'new_only' | 'existing_only';
+export type DueWindowMode = 'all' | 'overdue_only' | 'not_overdue_only';
 
 export interface CustomRulePreset {
   id: string;
@@ -41,11 +43,13 @@ export interface SyncRule {
   includeCompletedWithoutTaskId: boolean;
   markCompletedInTickTick: boolean;
   syncMode: SyncMode;
+  candidateSelectionMode?: CandidateSelectionMode;
+  dueWindowMode?: DueWindowMode;
   completedKeywords: string[];
 
   // rendering templates
   // Supported tokens:
-  // {{noteTitle}} {{filePath}} {{class}} {{obsidianLink}} {{ruleName}} {{dueRaw}}
+  // {{noteTitle}} {{filePath}} {{class}} {{obsidianLink}} {{obsidianMdLink}} {{ruleName}} {{dueRaw}}
   // {{duePretty}} {{status}} {{tags}} {{projectName}}
   titleTemplate: string;
   contentTemplate: string;

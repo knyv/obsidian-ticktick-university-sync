@@ -28,6 +28,25 @@ function getObsidianDeepLink(app: App, file: TFile): string {
   return `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(file.path)}`;
 }
 
+function getObsidianMarkdownLink(app: App, file: TFile): string {
+  const deep = getObsidianDeepLink(app, file);
+  return `[${file.basename}](${deep})`;
+}
+
+function parseDueForCompare(dueRaw: string): Date | null {
+  const raw = dueRaw.trim();
+  if (!raw) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, d] = raw.split('-').map((x) => Number(x));
+    return new Date(y, m - 1, d, 23, 59, 59, 999);
+  }
+
+  const normalized = raw.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+  const dt = new Date(normalized);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
 function matchesRule(tags: string[], rule: SyncRule): boolean {
   const normalizedTags = tags.map(normalizeTag);
   const include = rule.tagsAny.map(normalizeTag);
@@ -91,6 +110,19 @@ function collectTickTickTags(candidate: SyncCandidate): string[] {
   return merged;
 }
 
+function shouldSyncByDueWindow(dueRaw: string, mode: SyncRule['dueWindowMode']): boolean {
+  const dueMode = mode || 'all';
+  if (dueMode === 'all') return true;
+
+  const dueAt = parseDueForCompare(dueRaw);
+  if (!dueAt) return true;
+
+  const now = new Date();
+  if (dueMode === 'overdue_only') return dueAt.getTime() < now.getTime();
+  if (dueMode === 'not_overdue_only') return dueAt.getTime() >= now.getTime();
+  return true;
+}
+
 function buildTaskPayload(
   app: App,
   candidate: SyncCandidate,
@@ -102,6 +134,7 @@ function buildTaskPayload(
   const due = parseDueToTickTick(candidate.dueRaw);
   const classText = candidate.classNames.length ? candidate.classNames.join(', ') : '(not set)';
   const noteLink = getObsidianDeepLink(app, candidate.file);
+  const noteMdLink = getObsidianMarkdownLink(app, candidate.file);
   const statusText = toStringArray(candidate.statusRaw).join(', ') || String(candidate.statusRaw ?? '').trim();
   const tagsText = candidate.tags.join(', ');
   const ticktickTags = collectTickTickTags(candidate);
@@ -111,6 +144,7 @@ function buildTaskPayload(
     filePath: candidate.file.path,
     class: classText,
     obsidianLink: noteLink,
+    obsidianMdLink: noteMdLink,
     ruleName: candidate.rule.name,
     dueRaw: candidate.dueRaw,
     duePretty: prettyDue(candidate.dueRaw),
@@ -235,6 +269,17 @@ export async function runSync(
       const tracked = await tracking.read(candidate);
       const effectiveTaskId = candidate.taskId || tracked?.taskId;
       const effectiveProjectId = candidate.projectId || tracked?.projectId || project.id;
+
+      const selectionMode = candidate.rule.candidateSelectionMode || 'all';
+      if (selectionMode === 'new_only' && effectiveTaskId) {
+        continue;
+      }
+      if (selectionMode === 'existing_only' && !effectiveTaskId) {
+        continue;
+      }
+      if (!shouldSyncByDueWindow(candidate.dueRaw, candidate.rule.dueWindowMode)) {
+        continue;
+      }
 
       if (completed && !effectiveTaskId && !candidate.rule.includeCompletedWithoutTaskId) {
         summary.skippedCompletedNoTask += 1;

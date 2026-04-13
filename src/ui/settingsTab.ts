@@ -110,6 +110,7 @@ function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyToken
     'Title template sets task title (most important field).',
     'Content template maps to TickTick task content/body.',
     'Description template maps to TickTick description/notes.',
+    'Templates support Markdown text. For links, prefer {{obsidianMdLink}}.',
     'Use one of content/description for details to avoid redundancy.',
     'Obsidian links may not open in every TickTick client; desktop/browser support varies.',
     'Press Enter in template textareas for real line breaks (recommended).',
@@ -123,7 +124,8 @@ function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyToken
     '{{noteTitle}} = note filename without .md',
     '{{filePath}} = full vault-relative note path',
     '{{class}} = class field value from note properties',
-    '{{obsidianLink}} = clickable Obsidian URL (works if your device/browser supports obsidian:// links)',
+    '{{obsidianLink}} = raw obsidian:// URL (device/client support varies)',
+    '{{obsidianMdLink}} = Markdown link to obsidian:// URL (recommended in content/desc)',
     '{{ruleName}} = current rule name',
     '{{dueRaw}} = raw due property value',
     '{{duePretty}} = formatted due date/time',
@@ -149,6 +151,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   private presetDescriptionInput = '';
   private selectedCustomPresetId = '';
   private expandedRuleIds = new Set<string>();
+  private expansionInitialized = false;
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
@@ -175,7 +178,9 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     }
 
     this.plugin.settings.rules.push(rule);
+    this.expandedRuleIds.clear();
     this.expandedRuleIds.add(rule.id);
+    this.expansionInitialized = true;
     await this.plugin.saveSettings();
     this.display();
   }
@@ -193,7 +198,9 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     });
 
     this.plugin.settings.rules.push(rule);
+    this.expandedRuleIds.clear();
     this.expandedRuleIds.add(rule.id);
+    this.expansionInitialized = true;
     await this.plugin.saveSettings();
     this.display();
   }
@@ -225,8 +232,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   }
 
   private ensureRuleExpanded(ruleId: string) {
-    if (!this.expandedRuleIds.size) {
+    if (!this.expansionInitialized) {
+      this.expandedRuleIds.clear();
       this.expandedRuleIds.add(ruleId);
+      this.expansionInitialized = true;
     }
   }
 
@@ -235,8 +244,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     for (const id of Array.from(this.expandedRuleIds)) {
       if (!ids.has(id)) this.expandedRuleIds.delete(id);
     }
-    if (!this.expandedRuleIds.size && this.plugin.settings.rules.length) {
+    if (!this.expansionInitialized && this.plugin.settings.rules.length) {
+      this.expandedRuleIds.clear();
       this.expandedRuleIds.add(this.plugin.settings.rules[0].id);
+      this.expansionInitialized = true;
     }
   }
 
@@ -255,6 +266,11 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       if (this.expandedRuleIds.has(rule.id)) this.expandedRuleIds.delete(rule.id);
       else this.expandedRuleIds.add(rule.id);
       this.display();
+      setTimeout(() => {
+        const all = Array.from(this.containerEl.querySelectorAll('.ticktick-flow-rule-header button.clickable-icon')) as HTMLButtonElement[];
+        const btn = all[idx];
+        if (btn) btn.focus();
+      }, 0);
     });
 
     headerLeft.createEl('h4', {
@@ -354,6 +370,36 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('Which tasks to sync')
+      .setDesc('All, only new (not tracked yet), or only existing (already tracked)')
+      .addDropdown((d) =>
+        d
+          .addOption('all', 'All')
+          .addOption('new_only', 'Only new')
+          .addOption('existing_only', 'Only existing')
+          .setValue(rule.candidateSelectionMode || 'all')
+          .onChange(async (value) => {
+            rule.candidateSelectionMode = value === 'new_only' || value === 'existing_only' ? value : 'all';
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName('Due-date window')
+      .setDesc('Choose whether to sync overdue only, not-overdue only, or both')
+      .addDropdown((d) =>
+        d
+          .addOption('all', 'All due dates')
+          .addOption('overdue_only', 'Only already due (overdue)')
+          .addOption('not_overdue_only', 'Only upcoming/not overdue')
+          .setValue(rule.dueWindowMode || 'all')
+          .onChange(async (value) => {
+            rule.dueWindowMode = value === 'overdue_only' || value === 'not_overdue_only' ? value : 'all';
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
       .setName('Completion behavior')
       .setDesc('If enabled, completed notes can mark TickTick tasks done.')
       .addToggle((toggle) =>
@@ -382,7 +428,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         btn.setButtonText('Notes-focused').onClick(async () => {
           rule.titleTemplate = '{{noteTitle}}';
           rule.contentTemplate = '';
-          rule.descTemplate = `Open note: {{obsidianLink}}
+          rule.descTemplate = `Open note: {{obsidianMdLink}}
 Path: {{filePath}}`;
           await this.plugin.saveSettings();
           this.display();
@@ -400,7 +446,7 @@ Path: {{filePath}}`;
 
     new Setting(containerEl)
       .setName('Task content template')
-      .setDesc('TickTick task content/body. Keep short to avoid redundancy with due/date UI.')
+      .setDesc('TickTick task content/body. Markdown supported. Keep short to avoid redundancy with due/date UI.')
       .addTextArea((text) =>
         text.setValue(rule.contentTemplate).onChange(async (value) => {
           rule.contentTemplate = value;
@@ -410,7 +456,7 @@ Path: {{filePath}}`;
 
     new Setting(containerEl)
       .setName('Task description template')
-      .setDesc('TickTick description/notes field. Use this OR content template to avoid duplicate metadata.')
+      .setDesc('TickTick description/notes field. Markdown supported. Use this OR content template to avoid duplicate metadata.')
       .addTextArea((text) =>
         text.setValue(rule.descTemplate || '').onChange(async (value) => {
           rule.descTemplate = value || '';
@@ -935,6 +981,7 @@ Path: {{filePath}}`;
           await this.plugin.resetSettingsToDefault();
           this.projects = [];
           this.expandedRuleIds.clear();
+          this.expansionInitialized = false;
           this.presetRuleIndexInput = '';
           this.presetNameInput = '';
           this.presetDescriptionInput = '';

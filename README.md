@@ -62,7 +62,8 @@ Built-in template tokens:
 - `{{noteTitle}}` = note filename without `.md`
 - `{{filePath}}` = vault-relative note path
 - `{{class}}` = class property value
-- `{{obsidianLink}}` = obsidian deep link to note (opens only if client/device supports `obsidian://`)
+- `{{obsidianLink}}` = raw obsidian deep link (opens only if client/device supports `obsidian://`)
+- `{{obsidianMdLink}}` = Markdown link wrapper around obsidian deep link (recommended in content/desc)
 - `{{ruleName}}` = current sync rule name
 - `{{dueRaw}}` = raw due property value
 - `{{duePretty}}` = formatted due date/time text
@@ -93,6 +94,10 @@ Tag mapping to TickTick:
 Formatting presets included:
 - Minimal
 - Notes-focused
+
+Per-rule sync filters:
+- Which tasks to sync: All / Only new / Only existing
+- Due-date window: All due dates / Only already due (overdue) / Only upcoming
 
 ## Tracking mode (note metadata vs local file)
 
