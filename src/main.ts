@@ -31,7 +31,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
 
     this.addCommand({
-      id: 'ticktick-university-sync-now',
+      id: 'ticktick-flow-sync-now',
       name: 'Sync deadlines to TickTick now',
       callback: async () => {
         await this.syncNow();
@@ -39,7 +39,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
 
     this.addCommand({
-      id: 'ticktick-university-open-auth-url',
+      id: 'ticktick-flow-open-auth-url',
       name: 'Open TickTick OAuth authorization URL',
       callback: async () => {
         this.openOAuthUrl();
@@ -47,7 +47,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
 
     this.addCommand({
-      id: 'ticktick-university-exchange-auth-code',
+      id: 'ticktick-flow-exchange-auth-code',
       name: 'Exchange TickTick auth code/URL',
       callback: async () => {
         new AuthCodeModal(this.app, async (input) => {
@@ -57,7 +57,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
 
     this.addCommand({
-      id: 'ticktick-university-test-connection',
+      id: 'ticktick-flow-test-connection',
       name: 'Test TickTick API connection',
       callback: async () => {
         await this.testConnection();
@@ -65,7 +65,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
 
     this.addCommand({
-      id: 'ticktick-university-discover-projects',
+      id: 'ticktick-flow-discover-projects',
       name: 'Discover TickTick projects and auto-select target',
       callback: async () => {
         await this.discoverAndSelectProject();

@@ -2,7 +2,7 @@ import { App, normalizePath } from 'obsidian';
 import { SyncCandidate, TickTickUniversitySyncSettings, TrackingEntry, TrackingMap } from './types';
 
 function resolveTrackingPath(settings: TickTickUniversitySyncSettings): string {
-  return normalizePath(settings.localTrackingFile || '.obsidian/plugins/ticktick-university-sync/tracking.json');
+  return normalizePath(settings.localTrackingFile || '.obsidian/plugins/ticktick-flow-sync/tracking.json');
 }
 
 async function readTrackingMap(app: App, settings: TickTickUniversitySyncSettings): Promise<TrackingMap> {

@@ -1,6 +1,6 @@
 {
-  "name": "obsidian-ticktick-sync",
-  "version": "0.3.0",
+  "name": "obsidian-ticktick-flow-sync",
+  "version": "0.4.0",
   "description": "Rule-based Obsidian to TickTick sync with customizable formatting, projects, and tracking modes",
   "main": "main.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "plugin",
     "deadlines"
   ],
-  "author": "Kenny + Hermes",
+  "author": "knyv",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^24.7.2",

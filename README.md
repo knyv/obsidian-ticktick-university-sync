@@ -1,4 +1,4 @@
-# TickTick Sync (Obsidian Plugin)
+# TickTick Flow Sync (Obsidian Plugin)
 
 Modular, rule-based Obsidian -> TickTick sync for frontmatter deadlines/tasks.
 
@@ -69,7 +69,7 @@ npm run build
 
 2) Install into vault plugin folder:
 
-`<vault>/.obsidian/plugins/ticktick-university-sync/`
+`<vault>/.obsidian/plugins/ticktick-flow-sync/`
 
 Copy:
 - `main.js`

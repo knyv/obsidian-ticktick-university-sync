@@ -338,7 +338,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h2', { text: 'TickTick Sync' });
+    containerEl.createEl('h2', { text: 'TickTick Flow Sync' });
 
     containerEl.createEl('h3', { text: 'Quick setup wizard' });
     containerEl.createEl('pre', { text: setupStatusText(this.plugin) });
@@ -531,7 +531,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         .setDesc('Path inside vault for task-id mapping JSON')
         .addText((text) =>
           text.setValue(this.plugin.settings.localTrackingFile).onChange(async (value) => {
-            this.plugin.settings.localTrackingFile = value.trim() || '.obsidian/plugins/ticktick-university-sync/tracking.json';
+            this.plugin.settings.localTrackingFile = value.trim() || '.obsidian/plugins/ticktick-flow-sync/tracking.json';
             await this.plugin.saveSettings();
           }),
         );

@@ -47,7 +47,7 @@ export const DEFAULT_SETTINGS: TickTickUniversitySyncSettings = {
   dryRun: false,
 
   trackingMode: 'frontmatter',
-  localTrackingFile: '.obsidian/plugins/ticktick-university-sync/tracking.json',
+  localTrackingFile: '.obsidian/plugins/ticktick-flow-sync/tracking.json',
 
   rules: [makeUniversityRule()],
 };
@@ -97,7 +97,10 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
 
   if (!merged.trackingMode) merged.trackingMode = 'frontmatter';
   if (!merged.localTrackingFile?.trim()) {
-    merged.localTrackingFile = '.obsidian/plugins/ticktick-university-sync/tracking.json';
+    merged.localTrackingFile = '.obsidian/plugins/ticktick-flow-sync/tracking.json';
+  }
+  if (merged.localTrackingFile.trim() === '.obsidian/plugins/ticktick-university-sync/tracking.json') {
+    merged.localTrackingFile = '.obsidian/plugins/ticktick-flow-sync/tracking.json';
   }
 
   // normalize missing desc template in older rules
