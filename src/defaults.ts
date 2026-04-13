@@ -30,6 +30,7 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     ticktickTagsField: 'ticktick_tags',
     tagSourceMode: 'all_note_tags',
     fixedTickTickTags: [],
+    ticktickTagAssignmentMode: 'merge',
     ...overrides,
   };
 }
@@ -168,6 +169,7 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
     fixedTickTickTags: Array.isArray(rule.fixedTickTickTags)
       ? rule.fixedTickTickTags.map((x) => String(x).trim()).filter(Boolean)
       : [],
+    ticktickTagAssignmentMode: rule.ticktickTagAssignmentMode === 'rule_only' ? 'rule_only' : 'merge',
   }));
 
   if (!merged.trackingMode) merged.trackingMode = 'frontmatter';

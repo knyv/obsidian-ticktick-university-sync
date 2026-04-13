@@ -232,6 +232,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       ticktickTagsField: preset.ticktickTagsField || 'ticktick_tags',
       tagSourceMode: preset.tagSourceMode === 'include_tags' ? 'include_tags' : 'all_note_tags',
       fixedTickTickTags: Array.isArray(preset.fixedTickTickTags) ? [...preset.fixedTickTickTags] : [],
+      ticktickTagAssignmentMode: preset.ticktickTagAssignmentMode === 'rule_only' ? 'rule_only' : 'merge',
       statusField: preset.statusField || 'status',
       classField: preset.classField || 'class',
     });
@@ -602,15 +603,26 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName('TickTick tags source')
-        .setDesc('Choose whether tags come from all note tags or only include-tags, plus optional ticktick_tags field')
+        .setDesc('Choose whether tags come from note metadata or only from this rule')
         .addDropdown((d) =>
           d
-            .addOption('all_note_tags', 'All note tags (recommended)')
+            .addOption('all_note_tags', 'All note tags')
             .addOption('include_tags', 'Only include-tags from this rule')
             .setValue(rule.tagSourceMode || 'all_note_tags')
             .onChange(async (value) => {
               rule.tagSourceMode = value === 'include_tags' ? 'include_tags' : 'all_note_tags';
               await this.plugin.saveSettings();
+            }),
+        )
+        .addDropdown((d) =>
+          d
+            .addOption('merge', 'Tag mode: merge note/frontmatter + fixed rule tags')
+            .addOption('rule_only', 'Tag mode: use only fixed rule tags')
+            .setValue(rule.ticktickTagAssignmentMode || 'merge')
+            .onChange(async (value) => {
+              rule.ticktickTagAssignmentMode = value === 'rule_only' ? 'rule_only' : 'merge';
+              await this.plugin.saveSettings();
+              this.display();
             }),
         );
 

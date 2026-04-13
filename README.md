@@ -170,12 +170,15 @@ Formatting behavior update:
 - `descTemplate` is treated as legacy/optional (hidden in simple mode unless advanced is open)
 
 TickTick tags mapping:
-- Existing options retained:
-  - source from note tags OR include-tags
+- Source options:
+  - note tags (`all_note_tags`) OR include-tags (`include_tags`)
   - optional frontmatter tags field (`ticktick_tags`)
-- New options:
-  - fixed per-rule TickTick tags (`Fixed TickTick tags`) always appended to matching tasks
+- Rule tag options:
+  - fixed per-rule TickTick tags (`Fixed TickTick tags`)
   - `Suggest` button (best-effort) pulls known tags from current TickTick tasks and appends up to 8 unseen tags
+- Assignment mode per rule:
+  - `merge` (default): combine note/frontmatter tags + fixed rule tags
+  - `rule_only`: ignore note/frontmatter tags and assign only fixed rule tags
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
 ## Commands

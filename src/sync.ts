@@ -108,6 +108,10 @@ function collectTickTickTags(candidate: SyncCandidate): string[] {
 
   const fixed = (candidate.rule.fixedTickTickTags || []).map(normalizeTag).filter(Boolean);
 
+  if (candidate.rule.ticktickTagAssignmentMode === 'rule_only') {
+    return Array.from(new Set(fixed));
+  }
+
   const merged = Array.from(new Set([...fromSource, ...extra, ...fixed]));
   return merged;
 }

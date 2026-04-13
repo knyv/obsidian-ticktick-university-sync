@@ -368,6 +368,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       ticktickTagsField: rule.ticktickTagsField,
       tagSourceMode: rule.tagSourceMode,
       fixedTickTickTags: [...(rule.fixedTickTickTags || [])],
+      ticktickTagAssignmentMode: rule.ticktickTagAssignmentMode,
       statusField: rule.statusField,
       classField: rule.classField,
     });

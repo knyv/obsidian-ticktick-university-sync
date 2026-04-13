@@ -3,6 +3,7 @@ import { TFile } from 'obsidian';
 export type SyncMode = 'upsert' | 'create_only';
 export type TrackingMode = 'frontmatter' | 'local_json';
 export type TagSourceMode = 'all_note_tags' | 'include_tags';
+export type TickTickTagAssignmentMode = 'merge' | 'rule_only';
 export type CandidateSelectionMode = 'all' | 'new_only' | 'existing_only';
 export type DueWindowMode = 'all' | 'overdue_only' | 'not_overdue_only';
 
@@ -29,6 +30,7 @@ export interface CustomRulePreset {
   ticktickTagsField?: string;
   tagSourceMode?: TagSourceMode;
   fixedTickTickTags?: string[];
+  ticktickTagAssignmentMode?: TickTickTagAssignmentMode;
   statusField?: string;
   classField?: string;
 }
@@ -76,6 +78,7 @@ export interface SyncRule {
   ticktickTagsField?: string;
   tagSourceMode?: TagSourceMode;
   fixedTickTickTags?: string[];
+  ticktickTagAssignmentMode?: TickTickTagAssignmentMode;
 }
 
 
