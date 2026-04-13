@@ -191,7 +191,9 @@ Tracking/update behavior:
 - Local JSON mode prefers local tracking entry, then falls back to frontmatter task ID if present.
 - Local tracking now stores both legacy key (`file.path`) and rule-scoped key (`rule.id::file.path`) to avoid collisions when multiple rules target same note.
 - Local tracking mirror is maintained in both modes to reduce accidental duplicates during mode switches/migrations.
-- If tracking IDs are missing/stale, sync now attempts heuristic relink in target project (title + due-date match) before creating new tasks.
+- If tracking IDs are missing/stale, sync now attempts relink in target project before creating new tasks:
+  - first by internal sync marker in task content
+  - then by title + due-date heuristic
 - Added command: `Tracking: link note to existing TickTick task` for explicit manual repair.
 
 Status sync behavior:
@@ -206,6 +208,10 @@ Status sync behavior:
 - Bidirectional result during sync:
   - Completed in Obsidian -> task completed in TickTick
   - Open/not-started in Obsidian -> task forced open (unchecked) in TickTick
+
+Source marker behavior:
+- Source marker text is appended to task content (not description).
+- Plugin also appends an internal sync marker in content for reliable relinking after manual task deletion/recreation.
 
 Guides/help blocks in settings:
 - Rule guide, preset guide, task content help, and template tokens are now visible in all modes.

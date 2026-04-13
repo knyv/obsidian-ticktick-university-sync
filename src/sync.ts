@@ -215,6 +215,22 @@ function sameTaskByContent(candidate: SyncCandidate, remote: TickTickTaskSummary
   return true;
 }
 
+function makeSyncMarker(candidate: SyncCandidate): string {
+  return `[tfs:${candidate.rule.id}:${candidate.file.path}]`;
+}
+
+function findExistingTaskByMarker(candidate: SyncCandidate, tasks: TickTickTaskSummary[]): ExistingTaskRef | undefined {
+  const marker = makeSyncMarker(candidate).toLowerCase();
+  const found = tasks.find((t) => {
+    const c = String(t.content || '').toLowerCase();
+    const d = String(t.desc || '').toLowerCase();
+    return c.includes(marker) || d.includes(marker);
+  });
+
+  if (found?.id) return { taskId: found.id, projectId: found.projectId };
+  return undefined;
+}
+
 function findExistingTaskByHeuristic(candidate: SyncCandidate, tasks: TickTickTaskSummary[]): ExistingTaskRef | undefined {
   if (!tasks.length) return undefined;
 
@@ -295,7 +311,8 @@ function buildTaskPayload(
     .trim();
 
   const sourceMarker = settings.addSourceMarker ? settings.sourceMarkerText.trim() : '';
-  const mergedDesc = [desc, sourceMarker].filter(Boolean).join('\n\n');
+  const syncMarker = makeSyncMarker(candidate);
+  const mergedContent = [content, sourceMarker, syncMarker].filter(Boolean).join('\n\n');
 
   const statusCode = resolveTaskStatusCode(candidate);
 
@@ -303,8 +320,8 @@ function buildTaskPayload(
     id: existingId,
     projectId,
     title: title || candidate.file.basename,
-    content,
-    desc: mergedDesc || undefined,
+    content: mergedContent,
+    desc: desc || undefined,
     tags: ticktickTags.length ? ticktickTags : undefined,
     isAllDay: due?.isAllDay,
     startDate: due?.startDate,
@@ -433,7 +450,11 @@ export async function runSync(
         try {
           phase = 'heuristic-relink';
           const tasks = await client.listProjectTasks(project.id);
-          const found = findExistingTaskByHeuristic(candidate, tasks);
+
+          // Highest confidence: internal sync marker in content/desc.
+          const byMarker = findExistingTaskByMarker(candidate, tasks);
+          const found = byMarker || findExistingTaskByHeuristic(candidate, tasks);
+
           if (found?.taskId) {
             verifiedTaskId = found.taskId;
             verifiedProjectId = found.projectId || project.id;

@@ -6,10 +6,6 @@ export class TickTickClient {
   private getAccessToken: () => Promise<string>;
   private refreshIfNeeded: () => Promise<void>;
 
-  private isEmptyJsonParseError(err: unknown): boolean {
-    const msg = err instanceof Error ? err.message : String(err);
-    return msg.toLowerCase().includes('unexpected end of json input');
-  }
 
   constructor(args: { getAccessToken: () => Promise<string>; refreshIfNeeded: () => Promise<void> }) {
     this.getAccessToken = args.getAccessToken;
@@ -43,6 +39,11 @@ export class TickTickClient {
       console.error('[TickTick Flow Sync] API error:', method, path, res.status, res.text);
       const detail = (res.text || '').slice(0, 180).replace(/\s+/g, ' ').trim();
       throw new Error(`TickTick API ${method} ${path} failed (${res.status})${detail ? `: ${detail}` : ''}`);
+    }
+
+    // Some TickTick endpoints return empty body with 2xx.
+    if (!res.text || !String(res.text).trim()) {
+      return {} as T;
     }
 
     return (res.json ?? {}) as T;
@@ -81,37 +82,19 @@ export class TickTickClient {
   }
 
   async completeTask(projectId: string, taskId: string): Promise<void> {
-    try {
-      await this.request(
-        `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}/complete`,
-        'POST',
-        {},
-      );
-    } catch (e) {
-      // TickTick complete endpoint can return empty body; some clients surface JSON parse error even when completion succeeded.
-      if (this.isEmptyJsonParseError(e)) {
-        console.warn('[TickTick Flow Sync] Ignoring empty-body JSON parse error from complete endpoint', { projectId, taskId });
-        return;
-      }
-      throw e;
-    }
+    await this.request(
+      `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}/complete`,
+      'POST',
+      {},
+    );
   }
 
   async reopenTask(projectId: string, taskId: string): Promise<void> {
-    try {
-      await this.request(
-        `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}/close`,
-        'POST',
-        {},
-      );
-    } catch (e) {
-      // TickTick reopen/close-style endpoints can also return empty body.
-      if (this.isEmptyJsonParseError(e)) {
-        console.warn('[TickTick Flow Sync] Ignoring empty-body JSON parse error from reopen endpoint', { projectId, taskId });
-        return;
-      }
-      throw e;
-    }
+    await this.request(
+      `/open/v1/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}/close`,
+      'POST',
+      {},
+    );
   }
 
   async listKnownTags(maxProjects: number = 25): Promise<string[]> {
