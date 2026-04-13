@@ -43,8 +43,9 @@ export async function getTrackingForCandidate(
   app: App,
   settings: TickTickUniversitySyncSettings,
   candidate: SyncCandidate,
+  opts?: { forceLocal?: boolean },
 ): Promise<TrackingEntry | undefined> {
-  if (settings.trackingMode !== 'local_json') return undefined;
+  if (settings.trackingMode !== 'local_json' && !opts?.forceLocal) return undefined;
   const map = await readTrackingMap(app, settings);
   return map[candidate.file.path];
 }
@@ -54,8 +55,9 @@ export async function setTrackingForCandidate(
   settings: TickTickUniversitySyncSettings,
   candidate: SyncCandidate,
   entry: TrackingEntry,
+  opts?: { forceLocal?: boolean },
 ): Promise<void> {
-  if (settings.trackingMode !== 'local_json') return;
+  if (settings.trackingMode !== 'local_json' && !opts?.forceLocal) return;
   const map = await readTrackingMap(app, settings);
   map[candidate.file.path] = entry;
   await writeTrackingMap(app, settings, map);

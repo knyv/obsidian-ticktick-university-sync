@@ -8,12 +8,18 @@ import {
   TickTickTaskPayload,
   TickTickUniversitySyncSettings,
   TrackingEntry,
+  TrackingMode,
 } from './types';
 import { firstNonEmptyField, normalizeTag, prettyDue, renderTemplate, toStringArray } from './utils';
 
 export type TrackingProvider = {
   read: (candidate: SyncCandidate) => Promise<TrackingEntry | undefined>;
   write: (candidate: SyncCandidate, entry: TrackingEntry) => Promise<void>;
+};
+
+type ExistingTaskRef = {
+  taskId: string;
+  projectId?: string;
 };
 
 function isCompletedStatus(statusRaw: unknown, keywords: string[]): boolean {
@@ -131,6 +137,27 @@ function shouldSyncByDueWindow(dueRaw: string, mode: SyncRule['dueWindowMode']):
   if (dueMode === 'overdue_only') return dueAt.getTime() < now.getTime();
   if (dueMode === 'not_overdue_only') return dueAt.getTime() >= now.getTime();
   return true;
+}
+
+function pickExistingTaskRef(
+  candidate: SyncCandidate,
+  tracked: TrackingEntry | undefined,
+  trackingMode: TrackingMode,
+): ExistingTaskRef | undefined {
+  const fmTaskId = candidate.taskId?.trim();
+  const fmProjectId = candidate.projectId?.trim();
+  const localTaskId = tracked?.taskId?.trim();
+  const localProjectId = tracked?.projectId?.trim();
+
+  if (trackingMode === 'frontmatter') {
+    if (fmTaskId) return { taskId: fmTaskId, projectId: fmProjectId || localProjectId };
+    if (localTaskId) return { taskId: localTaskId, projectId: localProjectId || fmProjectId };
+    return undefined;
+  }
+
+  if (localTaskId) return { taskId: localTaskId, projectId: localProjectId || fmProjectId };
+  if (fmTaskId) return { taskId: fmTaskId, projectId: fmProjectId || localProjectId };
+  return undefined;
 }
 
 function buildTaskPayload(
@@ -281,8 +308,9 @@ export async function runSync(
       const project = await ensureRuleProject(client, candidate.rule);
 
       const tracked = await tracking.read(candidate);
-      const effectiveTaskId = candidate.taskId || tracked?.taskId;
-      const effectiveProjectId = candidate.projectId || tracked?.projectId || project.id;
+      const existingRef = pickExistingTaskRef(candidate, tracked, settings.trackingMode);
+      const effectiveTaskId = existingRef?.taskId;
+      const effectiveProjectId = existingRef?.projectId || project.id;
 
       const selectionMode = candidate.rule.candidateSelectionMode || 'all';
       if (selectionMode === 'new_only' && effectiveTaskId) {

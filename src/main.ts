@@ -383,11 +383,14 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
     try {
       const { summary, failures } = await runSync(this.app, this.settings, this.client, {
-        read: async (candidate) => getTrackingForCandidate(this.app, this.settings, candidate),
+        read: async (candidate) => {
+          // In frontmatter mode, still read local-json as fallback so existing tracked tasks update instead of duplicating.
+          const forceLocalFallback = this.settings.trackingMode === 'frontmatter';
+          return getTrackingForCandidate(this.app, this.settings, candidate, { forceLocal: forceLocalFallback });
+        },
         write: async (candidate, entry) => {
-          if (this.settings.trackingMode === 'local_json') {
-            await setTrackingForCandidate(this.app, this.settings, candidate, entry);
-          }
+          // Always keep local-json mirror for stable migration/fallback across tracking modes.
+          await setTrackingForCandidate(this.app, this.settings, candidate, entry, { forceLocal: true });
         },
       });
 

@@ -185,6 +185,12 @@ TickTick tags mapping:
   - `rule_only`: assign only fixed rule tags
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
+Tracking/update behavior:
+- Plugin updates existing tasks when it finds a tracked task ID.
+- Frontmatter mode prefers frontmatter task ID, then falls back to local-json mirror if needed.
+- Local JSON mode prefers local tracking entry, then falls back to frontmatter task ID if present.
+- Local tracking mirror is now maintained in both modes to reduce accidental duplicates during mode switches/migrations.
+
 ## Commands
 
 Command palette now focuses on operational commands (OAuth beginner actions are handled in Settings > Setup):
