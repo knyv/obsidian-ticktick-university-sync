@@ -29,6 +29,13 @@ function isCompletedStatus(statusRaw: unknown, keywords: string[]): boolean {
   return keywords.some((k) => joined.includes(k.toLowerCase()));
 }
 
+function isOpenStatus(statusRaw: unknown): boolean {
+  const joined = [...toStringArray(statusRaw), typeof statusRaw === 'string' ? statusRaw : '']
+    .map((s) => String(s).toLowerCase())
+    .join(' ');
+  return ['in progress', 'in-progress', 'ongoing', 'started', 'todo', 'to do', 'not started', 'open'].some((k) => joined.includes(k));
+}
+
 function getObsidianDeepLink(app: App, file: TFile): string {
   const vaultName = app.vault.getName();
   return `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(file.path)}`;
@@ -220,6 +227,11 @@ function buildTaskPayload(
   const sourceMarker = settings.addSourceMarker ? settings.sourceMarkerText.trim() : '';
   const mergedDesc = [desc, sourceMarker].filter(Boolean).join('\n\n');
 
+  const completed = isCompletedStatus(candidate.statusRaw, candidate.rule.completedKeywords);
+  const statusCode = candidate.rule.taskStatusSyncMode === 'obsidian_to_ticktick'
+    ? (completed ? 2 : (isOpenStatus(candidate.statusRaw) ? 0 : 0))
+    : (completed ? 2 : 0);
+
   return {
     id: existingId,
     projectId,
@@ -231,7 +243,7 @@ function buildTaskPayload(
     startDate: due?.startDate,
     dueDate: due?.dueDate,
     timeZone: due?.timeZone,
-    status: isCompletedStatus(candidate.statusRaw, candidate.rule.completedKeywords) ? 2 : 0,
+    status: statusCode,
   };
 }
 

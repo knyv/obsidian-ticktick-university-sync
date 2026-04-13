@@ -5,6 +5,10 @@ function resolveTrackingPath(settings: TickTickUniversitySyncSettings): string {
   return normalizePath(settings.localTrackingFile || '.obsidian/plugins/ticktick-flow-sync/tracking.json');
 }
 
+function ruleScopedKey(candidate: SyncCandidate): string {
+  return `${candidate.rule.id}::${candidate.file.path}`;
+}
+
 async function readTrackingMap(app: App, settings: TickTickUniversitySyncSettings): Promise<TrackingMap> {
   const path = resolveTrackingPath(settings);
   const file = app.vault.getAbstractFileByPath(path);
@@ -47,6 +51,8 @@ export async function getTrackingForCandidate(
 ): Promise<TrackingEntry | undefined> {
   if (settings.trackingMode !== 'local_json' && !opts?.forceLocal) return undefined;
   const map = await readTrackingMap(app, settings);
+  const scoped = map[ruleScopedKey(candidate)];
+  if (scoped) return scoped;
   return map[candidate.file.path];
 }
 
@@ -60,5 +66,6 @@ export async function setTrackingForCandidate(
   if (settings.trackingMode !== 'local_json' && !opts?.forceLocal) return;
   const map = await readTrackingMap(app, settings);
   map[candidate.file.path] = entry;
+  map[ruleScopedKey(candidate)] = entry;
   await writeTrackingMap(app, settings, map);
 }

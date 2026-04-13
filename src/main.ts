@@ -347,6 +347,7 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       includeCompletedWithoutTaskId: rule.includeCompletedWithoutTaskId,
       candidateSelectionMode: rule.candidateSelectionMode,
       dueWindowMode: rule.dueWindowMode,
+      taskStatusSyncMode: rule.taskStatusSyncMode,
       completedKeywords: [...rule.completedKeywords],
       titleTemplate: rule.titleTemplate,
       contentTemplate: rule.contentTemplate,

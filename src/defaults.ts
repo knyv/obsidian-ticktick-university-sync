@@ -20,6 +20,7 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     includeCompletedWithoutTaskId: false,
     markCompletedInTickTick: true,
     syncMode: 'upsert',
+    taskStatusSyncMode: 'off',
     requireDueDate: true,
     candidateSelectionMode: 'all',
     dueWindowMode: 'all',
@@ -162,6 +163,7 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       rule.dueWindowMode === 'overdue_only' || rule.dueWindowMode === 'not_overdue_only'
         ? rule.dueWindowMode
         : 'all',
+    taskStatusSyncMode: rule.taskStatusSyncMode === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off',
     ticktickTagsField: typeof rule.ticktickTagsField === 'string' && rule.ticktickTagsField.trim()
       ? rule.ticktickTagsField
       : 'ticktick_tags',

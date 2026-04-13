@@ -5,6 +5,7 @@ export type TrackingMode = 'frontmatter' | 'local_json';
 // include_tags kept for legacy migration compatibility; UI now uses 'none' instead.
 export type TagSourceMode = 'all_note_tags' | 'none' | 'include_tags';
 export type TickTickTagAssignmentMode = 'merge' | 'rule_only';
+export type TaskStatusSyncMode = 'off' | 'obsidian_to_ticktick';
 export type CandidateSelectionMode = 'all' | 'new_only' | 'existing_only';
 export type DueWindowMode = 'all' | 'overdue_only' | 'not_overdue_only';
 
@@ -24,6 +25,7 @@ export interface CustomRulePreset {
   includeCompletedWithoutTaskId?: boolean;
   candidateSelectionMode?: CandidateSelectionMode;
   dueWindowMode?: DueWindowMode;
+  taskStatusSyncMode?: TaskStatusSyncMode;
   completedKeywords?: string[];
   titleTemplate?: string;
   contentTemplate?: string;
@@ -62,6 +64,7 @@ export interface SyncRule {
   includeCompletedWithoutTaskId: boolean;
   markCompletedInTickTick: boolean;
   syncMode: SyncMode;
+  taskStatusSyncMode?: TaskStatusSyncMode;
   requireDueDate?: boolean;
   candidateSelectionMode?: CandidateSelectionMode;
   dueWindowMode?: DueWindowMode;

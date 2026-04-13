@@ -189,7 +189,13 @@ Tracking/update behavior:
 - Plugin updates existing tasks when it finds a tracked task ID.
 - Frontmatter mode prefers frontmatter task ID, then falls back to local-json mirror if needed.
 - Local JSON mode prefers local tracking entry, then falls back to frontmatter task ID if present.
-- Local tracking mirror is now maintained in both modes to reduce accidental duplicates during mode switches/migrations.
+- Local tracking now stores both legacy key (`file.path`) and rule-scoped key (`rule.id::file.path`) to avoid collisions when multiple rules target same note.
+- Local tracking mirror is maintained in both modes to reduce accidental duplicates during mode switches/migrations.
+
+Status sync behavior:
+- Rule setting `Status sync mode` controls mapping from note status property to TickTick open/closed:
+  - `Off` (default): preserve existing completion logic only
+  - `Obsidian status -> TickTick open/closed`: interpret note status text and map completed keywords to closed
 
 ## Commands
 

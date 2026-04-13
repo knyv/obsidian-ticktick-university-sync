@@ -223,6 +223,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       includeCompletedWithoutTaskId: preset.includeCompletedWithoutTaskId ?? false,
       candidateSelectionMode: preset.candidateSelectionMode ?? 'all',
       dueWindowMode: preset.dueWindowMode ?? 'all',
+      taskStatusSyncMode: preset.taskStatusSyncMode === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off',
       completedKeywords: Array.isArray(preset.completedKeywords) && preset.completedKeywords.length
         ? [...preset.completedKeywords]
         : ['completed', 'complete', 'done', 'finished'],
@@ -527,6 +528,20 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           rule.markCompletedInTickTick = value;
           await this.plugin.saveSettings();
         }),
+      );
+
+    new Setting(containerEl)
+      .setName('Status sync mode')
+      .setDesc('Optionally map note status property to TickTick open/closed state')
+      .addDropdown((d) =>
+        d
+          .addOption('off', 'Off (default)')
+          .addOption('obsidian_to_ticktick', 'Obsidian status -> TickTick open/closed')
+          .setValue(rule.taskStatusSyncMode || 'off')
+          .onChange(async (value) => {
+            rule.taskStatusSyncMode = value === 'obsidian_to_ticktick' ? 'obsidian_to_ticktick' : 'off';
+            await this.plugin.saveSettings();
+          }),
       );
 
     containerEl.createEl('h5', { text: 'D) TickTick task content' });
