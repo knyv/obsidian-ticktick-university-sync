@@ -365,13 +365,24 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Rule name')
       .setDesc('Friendly name only (for your own clarity).')
-      .addText((text) =>
-        text.setValue(rule.name).onChange(async (value) => {
-          rule.name = value.trim() || `Rule ${idx + 1}`;
+      .addText((text) => {
+        text.setValue(rule.name);
+        let debounceTimer: number | null = null;
+        text.inputEl.addEventListener('input', () => {
+          if (debounceTimer) window.clearTimeout(debounceTimer);
+          debounceTimer = window.setTimeout(async () => {
+            rule.name = text.inputEl.value.trim() || `Rule ${idx + 1}`;
+            await this.plugin.saveSettings();
+          }, 250);
+        });
+        text.inputEl.addEventListener('blur', async () => {
+          if (debounceTimer) window.clearTimeout(debounceTimer);
+          rule.name = text.inputEl.value.trim() || `Rule ${idx + 1}`;
           await this.plugin.saveSettings();
           this.display();
-        }),
-      );
+        });
+        return text;
+      });
 
     new Setting(containerEl)
       .setName('Obsidian include tags (match only)')
@@ -748,9 +759,9 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Rule actions')
-      .setDesc('Save this exact rule as preset, duplicate it, tune advanced options, or delete it.')
+      .setDesc('Quick actions for this rule')
       .addButton((btn) =>
-        btn.setButtonText('Save as preset').onClick(() => {
+        btn.setButtonText('Save preset').setClass('mod-cta').onClick(() => {
           if (this.presetEditorOpenByRuleId.has(rule.id)) this.presetEditorOpenByRuleId.delete(rule.id);
           else this.presetEditorOpenByRuleId.add(rule.id);
           this.display();
@@ -764,7 +775,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       )
       .addButton((btn) =>
-        btn.setButtonText(this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode ? 'Hide formatting' : 'Formatting').onClick(() => {
+        btn.setButtonText(this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode ? 'Hide content' : 'Content').onClick(() => {
           if (this.formattingEditorOpenByRuleId.has(rule.id)) this.formattingEditorOpenByRuleId.delete(rule.id);
           else this.formattingEditorOpenByRuleId.add(rule.id);
           this.display();

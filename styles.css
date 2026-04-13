@@ -164,6 +164,25 @@
   justify-content: flex-end;
 }
 
+.ticktick-flow-rule .setting-item {
+  align-items: flex-start;
+}
+
+.ticktick-flow-rule .setting-item-info {
+  min-width: 220px;
+}
+
+.ticktick-flow-rule .setting-item-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.ticktick-flow-rule .setting-item-control button {
+  min-width: 92px;
+}
+
 .ticktick-flow-add-rule-row button {
   width: 100%;
 }
