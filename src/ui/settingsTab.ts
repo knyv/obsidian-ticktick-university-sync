@@ -554,8 +554,18 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
 
     if (rule.taskStatusSyncMode === 'obsidian_to_ticktick') {
       new Setting(containerEl)
+        .setName('Status property name')
+        .setDesc('Frontmatter key to read status from (example: status, task_status)')
+        .addText((text) =>
+          text.setValue(rule.statusField).onChange(async (value) => {
+            rule.statusField = value.trim() || 'status';
+            await this.plugin.saveSettings();
+          }),
+        );
+
+      new Setting(containerEl)
         .setName('Status property type')
-        .setDesc('How to interpret the status field in frontmatter')
+        .setDesc('How to interpret the status field value')
         .addDropdown((d) =>
           d
             .addOption('text_or_list', 'Text/list values')
@@ -742,15 +752,17 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     if (this.advancedEditorOpenByRuleId.has(rule.id) || this.showAdvanced) {
       containerEl.createEl('h5', { text: 'Advanced rule options' });
 
-      new Setting(containerEl)
-        .setName('Status field key')
-        .setDesc('Frontmatter key used to detect completion status.')
-        .addText((text) =>
-          text.setValue(rule.statusField).onChange(async (value) => {
-            rule.statusField = value.trim() || 'status';
-            await this.plugin.saveSettings();
-          }),
-        );
+      if (rule.taskStatusSyncMode !== 'obsidian_to_ticktick') {
+        new Setting(containerEl)
+          .setName('Status field key')
+          .setDesc('Frontmatter key used to detect completion status.')
+          .addText((text) =>
+            text.setValue(rule.statusField).onChange(async (value) => {
+              rule.statusField = value.trim() || 'status';
+              await this.plugin.saveSettings();
+            }),
+          );
+      }
 
       new Setting(containerEl)
         .setName('Class field key')
@@ -1184,9 +1196,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   private renderAdvancedPane(containerEl: HTMLElement) {
     containerEl.createEl('h3', { text: '3) Advanced & performance' });
 
-    new Setting(containerEl)
+    const uiBlock = addCollapsibleInfoBlock(containerEl, 'UI behavior', 'Display options');
+    new Setting(uiBlock)
       .setName('Simple mode')
-      .setDesc('Beginner-first defaults and fewer visible controls in Rules pane')
+      .setDesc('Show a cleaner rules view with fewer always-visible controls')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.simpleMode).onChange(async (value) => {
           this.plugin.settings.simpleMode = value;
@@ -1195,9 +1208,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    new Setting(containerEl)
+    const syncBlock = addCollapsibleInfoBlock(containerEl, 'Sync timing', 'Startup and schedule');
+    new Setting(syncBlock)
       .setName('Sync on startup')
-      .setDesc('Runs one delayed sync after startup if already connected')
+      .setDesc('Run one delayed sync after startup if connected')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.syncOnStartup).onChange(async (value) => {
           this.plugin.settings.syncOnStartup = value;
@@ -1205,16 +1219,16 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       )
       .addText((text) =>
-        text.setPlaceholder('startup sync delay ms (e.g. 6000)').setValue(String(this.plugin.settings.startupSyncDelayMs || 0)).onChange(async (value) => {
+        text.setPlaceholder('startup sync delay ms').setValue(String(this.plugin.settings.startupSyncDelayMs || 0)).onChange(async (value) => {
           const n = Number(value);
           this.plugin.settings.startupSyncDelayMs = Number.isFinite(n) && n >= 0 ? n : 6000;
           await this.plugin.saveSettings();
         }),
       );
 
-    new Setting(containerEl)
+    new Setting(syncBlock)
       .setName('Auto-sync interval (minutes)')
-      .setDesc('0 disables periodic sync.')
+      .setDesc('0 turns periodic sync off')
       .addText((text) =>
         text.setPlaceholder('0').setValue(String(this.plugin.settings.autoSyncMinutes)).onChange(async (value) => {
           const n = Number(value);
@@ -1223,9 +1237,9 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    new Setting(containerEl)
+    new Setting(syncBlock)
       .setName('Dry run')
-      .setDesc('Evaluate only, do not write to TickTick.')
+      .setDesc('Preview changes without writing to TickTick')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.dryRun).onChange(async (value) => {
           this.plugin.settings.dryRun = value;
@@ -1233,9 +1247,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    new Setting(containerEl)
+    const trackingBlock = addCollapsibleInfoBlock(containerEl, 'Tracking', 'How note-task links are stored');
+    new Setting(trackingBlock)
       .setName('Tracking mode')
-      .setDesc('Frontmatter = IDs in notes. Local JSON = IDs only in plugin file.')
+      .setDesc('Frontmatter stores IDs in notes. Local JSON stores IDs in plugin file.')
       .addDropdown((d) =>
         d
           .addOption('frontmatter', 'Frontmatter (recommended)')
@@ -1249,7 +1264,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     if ((this.plugin.settings.trackingMode as TrackingMode) === 'local_json') {
-      new Setting(containerEl)
+      new Setting(trackingBlock)
         .setName('Local tracking file')
         .addText((text) =>
           text.setValue(this.plugin.settings.localTrackingFile).onChange(async (value) => {
@@ -1259,9 +1274,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         );
     }
 
-    new Setting(containerEl)
+    const templateBlock = addCollapsibleInfoBlock(containerEl, 'Template tokens', 'Custom property tokens');
+    new Setting(templateBlock)
       .setName('Template token mode')
-      .setDesc('Enable custom {{property}} tokens from note frontmatter')
+      .setDesc('Allow any {{propertyName}} token from note frontmatter')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.allowAllPropertyTokens).onChange(async (value) => {
           this.plugin.settings.allowAllPropertyTokens = value;
@@ -1269,9 +1285,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    new Setting(containerEl)
+    const startupBlock = addCollapsibleInfoBlock(containerEl, 'Startup preload', 'Project list preload behavior');
+    new Setting(startupBlock)
       .setName('Startup project preload')
-      .setDesc('Load project list automatically after startup (non-blocking)')
+      .setDesc('Load project list after startup (non-blocking)')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.preloadProjectsOnStartup).onChange(async (value) => {
           this.plugin.settings.preloadProjectsOnStartup = value;
@@ -1287,9 +1304,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    new Setting(containerEl)
+    const markerBlock = addCollapsibleInfoBlock(containerEl, 'Task source marker', 'Append source text to task description');
+    new Setting(markerBlock)
       .setName('Task source marker')
-      .setDesc('Append source text to task description')
+      .setDesc('Add source marker text to task description')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.addSourceMarker).onChange(async (value) => {
           this.plugin.settings.addSourceMarker = value;

@@ -199,6 +199,7 @@ Status sync behavior:
   - `Off` (default): keep legacy completion mapping
   - `Obsidian status -> TickTick open/closed`: use your custom status mapping
 - Status mapping options (per rule):
+  - `Status property name` (frontmatter key, e.g. `status`, `task_status`, `state`)
   - `Status property type`: `Text/list values` or `Checkbox`
   - `Status values treated as completed` (text/list)
   - `Status values treated as open` (text/list)
