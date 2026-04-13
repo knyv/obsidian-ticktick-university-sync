@@ -26,10 +26,10 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     completedKeywords: ['completed', 'complete', 'done', 'finished'],
     titleTemplate: '{{noteTitle}}',
     contentTemplate: ``,
-    descTemplate: `Open note: {{obsidianMdLink}}
-Path: {{filePath}}`,
+    descTemplate: ``,
     ticktickTagsField: 'ticktick_tags',
     tagSourceMode: 'all_note_tags',
+    fixedTickTickTags: [],
     ...overrides,
   };
 }
@@ -165,6 +165,9 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       ? rule.ticktickTagsField
       : 'ticktick_tags',
     tagSourceMode: rule.tagSourceMode === 'include_tags' ? 'include_tags' : 'all_note_tags',
+    fixedTickTickTags: Array.isArray(rule.fixedTickTickTags)
+      ? rule.fixedTickTickTags.map((x) => String(x).trim()).filter(Boolean)
+      : [],
   }));
 
   if (!merged.trackingMode) merged.trackingMode = 'frontmatter';
@@ -197,11 +200,9 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
         ? String((rule as { contentTemplate?: unknown }).contentTemplate)
         : ``,
     descTemplate:
-      typeof (rule as { descTemplate?: unknown }).descTemplate === 'string' &&
-      String((rule as { descTemplate?: unknown }).descTemplate).trim()
+      typeof (rule as { descTemplate?: unknown }).descTemplate === 'string'
         ? String((rule as { descTemplate?: unknown }).descTemplate)
-        : `Open note: {{obsidianMdLink}}
-Path: {{filePath}}`,
+        : ``,
   }));
 
   return merged;

@@ -28,6 +28,7 @@ export interface CustomRulePreset {
   descTemplate?: string;
   ticktickTagsField?: string;
   tagSourceMode?: TagSourceMode;
+  fixedTickTickTags?: string[];
   statusField?: string;
   classField?: string;
 }
@@ -74,6 +75,7 @@ export interface SyncRule {
   // optional metadata mappings
   ticktickTagsField?: string;
   tagSourceMode?: TagSourceMode;
+  fixedTickTickTags?: string[];
 }
 
 

@@ -156,6 +156,7 @@ Optional:
 Settings panes:
 - Setup: OAuth, connection test, project preload
 - Rules: add/edit rules, apply custom presets, save exact rule as preset
+  - include-tags editor no longer force-refreshes on every keystroke (fixes focus loss / one-letter typing bug)
   - each rule now has inline quick summary + readiness chip (`Ready to sync` / `Needs setup` / `Rule disabled`)
   - each rule shows explicit missing-state text in quick setup (`Missing: include tags`, `Missing: target project`)
   - each rule includes a `Fix this rule` quick action when project is missing
@@ -163,6 +164,17 @@ Settings panes:
   - formatting controls are collapsed by default in simple mode (`Formatting` button)
   - advanced per-rule options are hidden behind `Advanced` button in `Rule actions`
   - no-rules state now has guided CTAs (`+ Create first rule`, `+ Add Deadlines rule`)
+
+Formatting behavior update:
+- `contentTemplate` is now the primary recommended field for task details/links
+- `descTemplate` is treated as legacy/optional (hidden in simple mode unless advanced is open)
+
+TickTick tags mapping:
+- Existing options retained:
+  - source from note tags OR include-tags
+  - optional frontmatter tags field (`ticktick_tags`)
+- New option:
+  - fixed per-rule TickTick tags (`Fixed TickTick tags`) always appended to matching tasks
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
 ## Commands

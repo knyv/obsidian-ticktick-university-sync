@@ -109,10 +109,10 @@ function addFormattingGuideBlock(containerEl: HTMLElement, allowAllPropertyToken
   const ul = block.createEl('ul');
   [
     'Title template sets task title (most important field).',
-    'Content template maps to TickTick task content/body.',
-    'Description template maps to TickTick description/notes.',
+    'Content template maps to TickTick task content/body (primary recommended).',
+    'Description template is optional/legacy and may not be visible in all TickTick clients.',
     'Templates support Markdown text. For links, prefer {{obsidianMdLink}}.',
-    'Use one of content/description for details to avoid redundancy.',
+    'Prefer content template for details to avoid ambiguity.',
     'Obsidian links may not open in every TickTick client; desktop/browser support varies.',
     'Press Enter in template textareas for real line breaks (recommended).',
     'Literal \\n is also supported and converted automatically.',
@@ -228,9 +228,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         : ['completed', 'complete', 'done', 'finished'],
       titleTemplate: preset.titleTemplate || '{{noteTitle}}',
       contentTemplate: preset.contentTemplate || '',
-      descTemplate: preset.descTemplate || 'Open note: {{obsidianMdLink}}\nPath: {{filePath}}',
+      descTemplate: preset.descTemplate || '',
       ticktickTagsField: preset.ticktickTagsField || 'ticktick_tags',
       tagSourceMode: preset.tagSourceMode === 'include_tags' ? 'include_tags' : 'all_note_tags',
+      fixedTickTickTags: Array.isArray(preset.fixedTickTickTags) ? [...preset.fixedTickTickTags] : [],
       statusField: preset.statusField || 'status',
       classField: preset.classField || 'class',
     });
@@ -374,13 +375,24 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Include tags')
       .setDesc('Comma-separated. Note must contain at least one of these tags.')
-      .addText((text) =>
-        text.setPlaceholder('university/assignments, university/exams').setValue(listToCsv(rule.tagsAny)).onChange(async (value) => {
-          rule.tagsAny = csvToList(value);
+      .addText((text) => {
+        text.setPlaceholder('university/assignments, university/exams').setValue(listToCsv(rule.tagsAny));
+        let debounceTimer: number | null = null;
+        text.inputEl.addEventListener('input', () => {
+          if (debounceTimer) window.clearTimeout(debounceTimer);
+          debounceTimer = window.setTimeout(async () => {
+            rule.tagsAny = csvToList(text.inputEl.value);
+            await this.plugin.saveSettings();
+          }, 250);
+        });
+        text.inputEl.addEventListener('blur', async () => {
+          if (debounceTimer) window.clearTimeout(debounceTimer);
+          rule.tagsAny = csvToList(text.inputEl.value);
           await this.plugin.saveSettings();
           this.display();
-        }),
-      );
+        });
+        return text;
+      });
 
     const showMatchDetails = this.matchingDetailsOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode;
     new Setting(containerEl)
@@ -537,9 +549,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         .addButton((btn) =>
           btn.setButtonText('Notes-focused').onClick(async () => {
             rule.titleTemplate = '{{noteTitle}}';
-            rule.contentTemplate = '';
-            rule.descTemplate = `Open note: {{obsidianMdLink}}
-Path: {{filePath}}`;
+            rule.contentTemplate = `Open note: {{obsidianMdLink}}\nPath: {{filePath}}`;
+            rule.descTemplate = '';
             await this.plugin.saveSettings();
             this.display();
           }),
@@ -556,7 +567,7 @@ Path: {{filePath}}`;
 
       new Setting(containerEl)
         .setName('Task content template')
-        .setDesc('TickTick task content/body. Markdown supported. Keep short to avoid redundancy with due/date UI.')
+        .setDesc('Primary text field sent to TickTick. Markdown supported. Recommended for note links/details.')
         .addTextArea((text) =>
           text.setValue(rule.contentTemplate).onChange(async (value) => {
             rule.contentTemplate = value;
@@ -564,15 +575,17 @@ Path: {{filePath}}`;
           }),
         );
 
-      new Setting(containerEl)
-        .setName('Task description template')
-        .setDesc('TickTick description/notes field. Markdown supported. Use this OR content template to avoid duplicate metadata.')
-        .addTextArea((text) =>
-          text.setValue(rule.descTemplate || '').onChange(async (value) => {
-            rule.descTemplate = value || '';
-            await this.plugin.saveSettings();
-          }),
-        );
+      if (!this.plugin.settings.simpleMode || this.showAdvanced || this.advancedEditorOpenByRuleId.has(rule.id)) {
+        new Setting(containerEl)
+          .setName('Task description template (legacy/optional)')
+          .setDesc('Secondary text field (`desc`). Some TickTick clients may not show this clearly. Prefer content template.')
+          .addTextArea((text) =>
+            text.setValue(rule.descTemplate || '').onChange(async (value) => {
+              rule.descTemplate = value || '';
+              await this.plugin.saveSettings();
+            }),
+          );
+      }
 
       new Setting(containerEl)
         .setName('TickTick tags field (optional)')
@@ -597,6 +610,19 @@ Path: {{filePath}}`;
             .setValue(rule.tagSourceMode || 'all_note_tags')
             .onChange(async (value) => {
               rule.tagSourceMode = value === 'include_tags' ? 'include_tags' : 'all_note_tags';
+              await this.plugin.saveSettings();
+            }),
+        );
+
+      new Setting(containerEl)
+        .setName('Fixed TickTick tags (optional)')
+        .setDesc('Always add these TickTick tags for this rule (comma-separated). Example: focus, uni')
+        .addText((text) =>
+          text
+            .setPlaceholder('focus, uni')
+            .setValue(listToCsv(rule.fixedTickTickTags || []))
+            .onChange(async (value) => {
+              rule.fixedTickTickTags = csvToList(value);
               await this.plugin.saveSettings();
             }),
         );
@@ -724,6 +750,9 @@ Path: {{filePath}}`;
           copy.name = `${rule.name} copy`;
           this.plugin.settings.rules.splice(idx + 1, 0, copy);
           this.expandedRuleIds.add(copy.id);
+          this.matchingDetailsOpenByRuleId.delete(copy.id);
+          this.formattingEditorOpenByRuleId.delete(copy.id);
+          this.advancedEditorOpenByRuleId.delete(copy.id);
           await this.plugin.saveSettings();
           this.display();
         }),
@@ -909,6 +938,7 @@ Path: {{filePath}}`;
 
     new Setting(containerEl)
       .setName('Run sync now')
+      .setDesc('Quick manual sync from setup pane')
       .addButton((btn) =>
         btn.setButtonText('Sync now').setCta().onClick(async () => {
           try {
@@ -1188,6 +1218,19 @@ Path: {{filePath}}`;
 
     containerEl.createEl('h2', { text: 'TickTick Flow Sync' });
     containerEl.createEl('p', { text: 'Simple first. Pick a pane, get set up fast, customize later.' });
+
+    new Setting(containerEl)
+      .setName('Quick sync')
+      .setDesc('Run a manual sync now')
+      .addButton((btn) =>
+        btn.setButtonText('Sync now').setCta().onClick(async () => {
+          try {
+            await this.plugin.syncNow();
+          } catch (e) {
+            new Notice(e instanceof Error ? e.message : String(e));
+          }
+        }),
+      );
 
     new Setting(containerEl)
       .setName('Simple mode')

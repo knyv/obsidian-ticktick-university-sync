@@ -106,7 +106,9 @@ function collectTickTickTags(candidate: SyncCandidate): string[] {
     .map(normalizeTag)
     .filter(Boolean);
 
-  const merged = Array.from(new Set([...fromSource, ...extra]));
+  const fixed = (candidate.rule.fixedTickTickTags || []).map(normalizeTag).filter(Boolean);
+
+  const merged = Array.from(new Set([...fromSource, ...extra, ...fixed]));
   return merged;
 }
 
