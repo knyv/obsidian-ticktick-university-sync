@@ -177,6 +177,8 @@ export type SyncSummary = {
   updated: number;
   completed: number;
   skippedCompletedNoTask: number;
+  skippedBySelectionMode: number;
+  skippedByDueWindow: number;
   failed: number;
 };
 

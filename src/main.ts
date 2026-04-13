@@ -547,8 +547,8 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
 
       const tookMs = Date.now() - start;
       new Notice(
-        `TickTick sync done: scanned ${summary.scanned}, synced ${summary.synced}, created ${summary.created}, updated ${summary.updated}, completed ${summary.completed}, failed ${summary.failed} (${Math.round(tookMs / 1000)}s)`,
-        8000,
+        `TickTick sync done: scanned ${summary.scanned}, synced ${summary.synced}, created ${summary.created}, updated ${summary.updated}, completed ${summary.completed}, skipped(selection ${summary.skippedBySelectionMode}, due ${summary.skippedByDueWindow}, completed-no-id ${summary.skippedCompletedNoTask}), failed ${summary.failed} (${Math.round(tookMs / 1000)}s)`,
+        10000,
       );
 
       if (failures.length) {

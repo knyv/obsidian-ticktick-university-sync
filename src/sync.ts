@@ -391,6 +391,8 @@ export async function runSync(
     updated: 0,
     completed: 0,
     skippedCompletedNoTask: 0,
+    skippedBySelectionMode: 0,
+    skippedByDueWindow: 0,
     failed: 0,
   };
 
@@ -418,12 +420,15 @@ export async function runSync(
 
       const selectionMode = candidate.rule.candidateSelectionMode || 'all';
       if (selectionMode === 'new_only' && effectiveTaskId) {
+        summary.skippedBySelectionMode += 1;
         continue;
       }
       if (selectionMode === 'existing_only' && !effectiveTaskId) {
+        summary.skippedBySelectionMode += 1;
         continue;
       }
       if (!shouldSyncByDueWindow(candidate.dueRaw, candidate.rule.dueWindowMode)) {
+        summary.skippedByDueWindow += 1;
         continue;
       }
 
