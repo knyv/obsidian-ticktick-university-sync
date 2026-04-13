@@ -187,11 +187,11 @@ TickTick tags mapping:
 
 ## Commands
 
+Command palette now focuses on operational commands (OAuth beginner actions are handled in Settings > Setup):
+
 - Sync notes to TickTick now
-- Beginner path: open TickTick Developer Apps (step 1)
-- Beginner path: open TickTick OAuth URL (step 4)
-- Beginner path: exchange auth from clipboard (step 6)
-- Beginner path: exchange auth code/URL (manual alt)
+- Connection: refresh TickTick token
 - Connection check: test TickTick API
 - Projects: load TickTick project list
 - Projects: validate and refresh selected target projects
+- Tags: fetch known TickTick tags (preview)

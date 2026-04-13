@@ -7,7 +7,6 @@ import { runSync } from './sync';
 import { TickTickClient } from './ticktickClient';
 import { TickTickUniversitySyncSettings } from './types';
 import { getTrackingForCandidate, setTrackingForCandidate } from './tracking';
-import { AuthCodeModal } from './ui/authCodeModal';
 import { TickTickSyncSettingTab } from './ui/settingsTab';
 
 export default class TickTickSyncPlugin extends Plugin implements PluginApi {
@@ -42,36 +41,10 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     });
 
     this.addCommand({
-      id: 'ticktick-flow-open-auth-url',
-      name: 'Beginner path: open TickTick OAuth URL (step 4)',
+      id: 'ticktick-flow-refresh-token',
+      name: 'Connection: refresh TickTick token',
       callback: async () => {
-        this.openOAuthUrl();
-      },
-    });
-
-    this.addCommand({
-      id: 'ticktick-flow-open-developer-apps',
-      name: 'Beginner path: open TickTick Developer Apps (step 1)',
-      callback: async () => {
-        this.openTickTickDeveloperPage();
-      },
-    });
-
-    this.addCommand({
-      id: 'ticktick-flow-exchange-auth-code',
-      name: 'Beginner path: exchange auth code/URL (manual alt)',
-      callback: async () => {
-        new AuthCodeModal(this.app, async (input) => {
-          await this.exchangeAuthCode(input);
-        }).open();
-      },
-    });
-
-    this.addCommand({
-      id: 'ticktick-flow-exchange-auth-from-clipboard',
-      name: 'Beginner path: exchange auth from clipboard (step 6)',
-      callback: async () => {
-        await this.exchangeAuthCodeFromClipboard();
+        await this.refreshAccessToken();
       },
     });
 
@@ -96,6 +69,19 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       name: 'Projects: load TickTick project list',
       callback: async () => {
         await this.preloadProjects();
+      },
+    });
+
+    this.addCommand({
+      id: 'ticktick-flow-suggest-tags',
+      name: 'Tags: fetch known TickTick tags (preview)',
+      callback: async () => {
+        const tags = await this.listKnownTags();
+        if (!tags.length) {
+          new Notice('No TickTick tags found yet.');
+          return;
+        }
+        new Notice(`Known TickTick tags: ${tags.slice(0, 10).join(', ')}${tags.length > 10 ? '…' : ''}`);
       },
     });
 
