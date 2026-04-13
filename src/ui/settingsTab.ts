@@ -1,7 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import { makeUniversityRule } from '../defaults';
 import { PluginApi } from '../pluginApi';
-import { SyncRule } from '../types';
+import { SyncRule, TickTickProject, TrackingMode } from '../types';
 import { makeRuleId } from '../utils';
 import { AuthCodeModal } from './authCodeModal';
 
@@ -32,8 +32,9 @@ function setupStatusText(plugin: PluginApi): string {
   ].join('\n');
 }
 
-export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
+export class TickTickSyncSettingTab extends PluginSettingTab {
   plugin: PluginApi;
+  private projects: TickTickProject[] = [];
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
@@ -63,6 +64,22 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
     this.plugin.settings.rules.push(rule);
     await this.plugin.saveSettings();
     this.display();
+  }
+
+  private projectDropdownOptions(rule: SyncRule): Record<string, string> {
+    const options: Record<string, string> = {
+      '': '(none selected)',
+    };
+
+    for (const p of this.projects) {
+      options[p.id] = p.name;
+    }
+
+    if (rule.targetProjectId && !options[rule.targetProjectId]) {
+      options[rule.targetProjectId] = `${rule.targetProjectName || 'Unknown'} (saved)`;
+    }
+
+    return options;
   }
 
   private renderRule(containerEl: HTMLElement, rule: SyncRule, idx: number) {
@@ -136,6 +153,7 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Task ID field')
+      .setDesc('Used only when tracking mode is frontmatter')
       .addText((text) =>
         text.setValue(rule.taskIdField).onChange(async (value) => {
           rule.taskIdField = value.trim() || 'ticktick_task_id';
@@ -145,6 +163,7 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Project ID field')
+      .setDesc('Used only when tracking mode is frontmatter')
       .addText((text) =>
         text.setValue(rule.projectIdField).onChange(async (value) => {
           rule.projectIdField = value.trim() || 'ticktick_project_id';
@@ -154,6 +173,7 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Synced-at field')
+      .setDesc('Used only when tracking mode is frontmatter')
       .addText((text) =>
         text.setValue(rule.syncedAtField).onChange(async (value) => {
           rule.syncedAtField = value.trim() || 'ticktick_synced_at';
@@ -170,6 +190,20 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+
+    new Setting(containerEl)
+      .setName('Target project (dropdown)')
+      .setDesc('Load project list first, then select directly')
+      .addDropdown((d) => {
+        const options = this.projectDropdownOptions(rule);
+        Object.entries(options).forEach(([id, name]) => d.addOption(id, name));
+        d.setValue(rule.targetProjectId || '').onChange(async (value) => {
+          rule.targetProjectId = value;
+          const selected = this.projects.find((p) => p.id === value);
+          if (selected) rule.targetProjectName = selected.name;
+          await this.plugin.saveSettings();
+        });
+      });
 
     new Setting(containerEl)
       .setName('Target project ID')
@@ -203,7 +237,7 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
           .addOption('create_only', 'Create only')
           .setValue(rule.syncMode)
           .onChange(async (value) => {
-            rule.syncMode = (value === 'create_only' ? 'create_only' : 'upsert');
+            rule.syncMode = value === 'create_only' ? 'create_only' : 'upsert';
             await this.plugin.saveSettings();
           }),
       );
@@ -238,7 +272,7 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Task title template')
-      .setDesc('Tokens: {{noteTitle}}, {{filePath}}, {{class}}, {{obsidianLink}}, {{ruleName}}, {{dueRaw}}')
+      .setDesc('Tokens: {{noteTitle}}, {{duePretty}}, {{class}}, {{projectName}}, etc.')
       .addText((text) =>
         text.setValue(rule.titleTemplate).onChange(async (value) => {
           rule.titleTemplate = value || '{{noteTitle}}';
@@ -248,11 +282,43 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Task content template')
-      .setDesc('Same tokens as title. Use \\n for line breaks.')
+      .setDesc('Tokens supported. Use \\n for line breaks.')
       .addTextArea((text) =>
         text.setValue(rule.contentTemplate).onChange(async (value) => {
           rule.contentTemplate = value || 'Source: [{{noteTitle}}]({{obsidianLink}})';
           await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName('Task description template (desc)')
+      .setDesc('Optional long description field in TickTick. Same tokens.')
+      .addTextArea((text) =>
+        text.setValue(rule.descTemplate || '').onChange(async (value) => {
+          rule.descTemplate = value || '';
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName('Formatting preset')
+      .setDesc('Apply ready-made formatting templates to this rule')
+      .addButton((btn) =>
+        btn.setButtonText('Clean').onClick(async () => {
+          rule.titleTemplate = '{{noteTitle}}';
+          rule.contentTemplate = '📅 Due: {{duePretty}}\\n📚 Class: {{class}}\\n🔗 {{obsidianLink}}';
+          rule.descTemplate = 'Path: {{filePath}}\\nTags: {{tags}}\\nRule: {{ruleName}}';
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
+      .addButton((btn) =>
+        btn.setButtonText('Detailed').onClick(async () => {
+          rule.titleTemplate = '{{noteTitle}} · {{duePretty}}';
+          rule.contentTemplate = '📌 {{noteTitle}}\\n📅 {{duePretty}}\\n📚 {{class}}\\n🏷 {{tags}}';
+          rule.descTemplate = 'Status: {{status}}\\nProject: {{projectName}}\\nOpen: {{obsidianLink}}\\nPath: {{filePath}}\\nRule: {{ruleName}}';
+          await this.plugin.saveSettings();
+          this.display();
         }),
       );
 
@@ -268,11 +334,11 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
       );
   }
 
-  display(): void {
+  async display(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h2', { text: 'TickTick Deadline Sync' });
+    containerEl.createEl('h2', { text: 'TickTick Sync' });
 
     containerEl.createEl('h3', { text: 'Quick setup wizard' });
     containerEl.createEl('pre', { text: setupStatusText(this.plugin) });
@@ -396,6 +462,17 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
             new Notice(e instanceof Error ? e.message : String(e));
           }
         }),
+      )
+      .addButton((btn) =>
+        btn.setButtonText('Load project list').onClick(async () => {
+          try {
+            this.projects = await this.plugin.listProjects();
+            new Notice(`Loaded ${this.projects.length} projects.`);
+            this.display();
+          } catch (e) {
+            new Notice(e instanceof Error ? e.message : String(e));
+          }
+        }),
       );
 
     containerEl.createEl('h3', { text: 'Global sync behavior' });
@@ -432,6 +509,33 @@ export class TickTickUniversitySyncSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+
+    new Setting(containerEl)
+      .setName('Tracking mode')
+      .setDesc('frontmatter = write ids into notes. local_json = keep ids in plugin JSON store.')
+      .addDropdown((d) =>
+        d
+          .addOption('frontmatter', 'Frontmatter')
+          .addOption('local_json', 'Local JSON')
+          .setValue(this.plugin.settings.trackingMode)
+          .onChange(async (value) => {
+            this.plugin.settings.trackingMode = value === 'local_json' ? 'local_json' : 'frontmatter';
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+      );
+
+    if ((this.plugin.settings.trackingMode as TrackingMode) === 'local_json') {
+      new Setting(containerEl)
+        .setName('Local tracking file')
+        .setDesc('Path inside vault for task-id mapping JSON')
+        .addText((text) =>
+          text.setValue(this.plugin.settings.localTrackingFile).onChange(async (value) => {
+            this.plugin.settings.localTrackingFile = value.trim() || '.obsidian/plugins/ticktick-university-sync/tracking.json';
+            await this.plugin.saveSettings();
+          }),
+        );
+    }
 
     new Setting(containerEl)
       .setName('Fallback project name')

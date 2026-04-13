@@ -1,5 +1,5 @@
 import { App } from 'obsidian';
-import { TickTickUniversitySyncSettings } from './types';
+import { TickTickProject, TickTickUniversitySyncSettings } from './types';
 
 export interface PluginApi {
   app: App;
@@ -7,6 +7,7 @@ export interface PluginApi {
   saveSettings: () => Promise<void>;
   syncNow: () => Promise<void>;
   testConnection: () => Promise<void>;
+  listProjects: () => Promise<TickTickProject[]>;
   openOAuthUrl: () => void;
   exchangeAuthCode: (input: string) => Promise<void>;
   refreshAccessToken: () => Promise<void>;

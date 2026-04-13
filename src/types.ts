@@ -1,6 +1,7 @@
 import { TFile } from 'obsidian';
 
 export type SyncMode = 'upsert' | 'create_only';
+export type TrackingMode = 'frontmatter' | 'local_json';
 
 export interface SyncRule {
   id: string;
@@ -33,8 +34,10 @@ export interface SyncRule {
   // rendering templates
   // Supported tokens:
   // {{noteTitle}} {{filePath}} {{class}} {{obsidianLink}} {{ruleName}} {{dueRaw}}
+  // {{duePretty}} {{status}} {{tags}} {{projectName}}
   titleTemplate: string;
   contentTemplate: string;
+  descTemplate: string;
 }
 
 export interface TickTickUniversitySyncSettings {
@@ -53,6 +56,9 @@ export interface TickTickUniversitySyncSettings {
   syncOnStartup: boolean;
   autoSyncMinutes: number;
   dryRun: boolean;
+
+  trackingMode: TrackingMode;
+  localTrackingFile: string;
 
   rules: SyncRule[];
 }
@@ -78,6 +84,7 @@ export type TickTickTaskPayload = {
 
 export type SyncCandidate = {
   file: TFile;
+  frontmatter: Record<string, unknown>;
   rule: SyncRule;
   dueRaw: string;
   tags: string[];
@@ -96,6 +103,14 @@ export type SyncSummary = {
   skippedCompletedNoTask: number;
   failed: number;
 };
+
+export type TrackingEntry = {
+  taskId: string;
+  projectId: string;
+  syncedAt: string;
+};
+
+export type TrackingMap = Record<string, TrackingEntry>;
 
 // minimal shape for migrating legacy settings from v0.1.0
 export type LegacySettings = Partial<TickTickUniversitySyncSettings> & {

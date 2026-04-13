@@ -23,7 +23,8 @@ export function makeUniversityRule(overrides: Partial<SyncRule> = {}): SyncRule 
     completedKeywords: ['completed', 'complete', 'done', 'finished'],
     titleTemplate: '{{noteTitle}}',
     contentTemplate:
-      'Class: {{class}}\\nSource: [{{noteTitle}}]({{obsidianLink}})\\nObsidian path: {{filePath}}\\nRule: {{ruleName}}',
+      '📌 {{noteTitle}}\\n📚 Class: {{class}}\\n📅 Due: {{duePretty}}\\n🏷 Tags: {{tags}}\\n🔗 Open note: {{obsidianLink}}\\n📂 Path: {{filePath}}\\n⚙️ Rule: {{ruleName}}',
+    descTemplate: 'Status: {{status}}\\nProject: {{projectName}}',
     ...overrides,
   };
 }
@@ -44,6 +45,9 @@ export const DEFAULT_SETTINGS: TickTickUniversitySyncSettings = {
   syncOnStartup: false,
   autoSyncMinutes: 0,
   dryRun: false,
+
+  trackingMode: 'frontmatter',
+  localTrackingFile: '.obsidian/plugins/ticktick-university-sync/tracking.json',
 
   rules: [makeUniversityRule()],
 };
@@ -89,6 +93,19 @@ export function migrateSettings(raw: unknown): TickTickUniversitySyncSettings {
       Array.isArray(rule.completedKeywords) && rule.completedKeywords.length
         ? rule.completedKeywords
         : ['completed', 'complete', 'done', 'finished'],
+  }));
+
+  if (!merged.trackingMode) merged.trackingMode = 'frontmatter';
+  if (!merged.localTrackingFile?.trim()) {
+    merged.localTrackingFile = '.obsidian/plugins/ticktick-university-sync/tracking.json';
+  }
+
+  // normalize missing desc template in older rules
+  merged.rules = merged.rules.map((rule) => ({
+    ...rule,
+    descTemplate: typeof (rule as { descTemplate?: unknown }).descTemplate === 'string'
+      ? String((rule as { descTemplate?: unknown }).descTemplate)
+      : 'Status: {{status}}\\nProject: {{projectName}}',
   }));
 
   return merged;

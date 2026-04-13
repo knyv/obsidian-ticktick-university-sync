@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-ticktick-university-sync",
-  "version": "0.2.0",
-  "description": "Obsidian plugin to sync frontmatter deadlines from notes to TickTick with rule-based profiles",
+  "name": "obsidian-ticktick-sync",
+  "version": "0.3.0",
+  "description": "Rule-based Obsidian to TickTick sync with customizable formatting, projects, and tracking modes",
   "main": "main.js",
   "scripts": {
     "build": "node esbuild.config.mjs --production",

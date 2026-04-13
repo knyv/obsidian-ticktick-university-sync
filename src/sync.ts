@@ -1,8 +1,20 @@
 import { App, TFile } from 'obsidian';
 import { parseDueToTickTick } from './datetime';
 import { TickTickClient } from './ticktickClient';
-import { SyncCandidate, SyncRule, SyncSummary, TickTickTaskPayload, TickTickUniversitySyncSettings } from './types';
-import { firstNonEmptyField, normalizeTag, renderTemplate, toStringArray } from './utils';
+import {
+  SyncCandidate,
+  SyncRule,
+  SyncSummary,
+  TickTickTaskPayload,
+  TickTickUniversitySyncSettings,
+  TrackingEntry,
+} from './types';
+import { firstNonEmptyField, normalizeTag, prettyDue, renderTemplate, toStringArray } from './utils';
+
+export type TrackingProvider = {
+  read: (candidate: SyncCandidate) => Promise<TrackingEntry | undefined>;
+  write: (candidate: SyncCandidate, entry: TrackingEntry) => Promise<void>;
+};
 
 function isCompletedStatus(statusRaw: unknown, keywords: string[]): boolean {
   const arr = toStringArray(statusRaw).map((s) => s.toLowerCase());
@@ -52,6 +64,7 @@ export async function collectCandidates(app: App, settings: TickTickUniversitySy
 
       candidates.push({
         file,
+        frontmatter: fm,
         rule,
         dueRaw,
         tags,
@@ -66,28 +79,39 @@ export async function collectCandidates(app: App, settings: TickTickUniversitySy
   return candidates;
 }
 
-function buildTaskPayload(app: App, candidate: SyncCandidate, projectId: string, existingId?: string): TickTickTaskPayload {
+function buildTaskPayload(
+  app: App,
+  candidate: SyncCandidate,
+  projectId: string,
+  projectName: string,
+  existingId?: string,
+): TickTickTaskPayload {
   const due = parseDueToTickTick(candidate.dueRaw);
   const classText = candidate.classNames.length ? candidate.classNames.join(', ') : '(not set)';
   const noteLink = getObsidianDeepLink(app, candidate.file);
+  const statusText = toStringArray(candidate.statusRaw).join(', ') || String(candidate.statusRaw ?? '').trim();
+  const tagsText = candidate.tags.join(', ');
 
-  const title = renderTemplate(candidate.rule.titleTemplate, {
+  const tokens = {
     noteTitle: candidate.file.basename,
     filePath: candidate.file.path,
     class: classText,
     obsidianLink: noteLink,
     ruleName: candidate.rule.name,
     dueRaw: candidate.dueRaw,
-  }).trim();
+    duePretty: prettyDue(candidate.dueRaw),
+    status: statusText || '(not set)',
+    tags: tagsText || '(none)',
+    projectName: projectName || '(not set)',
+  };
 
-  const content = renderTemplate(candidate.rule.contentTemplate, {
-    noteTitle: candidate.file.basename,
-    filePath: candidate.file.path,
-    class: classText,
-    obsidianLink: noteLink,
-    ruleName: candidate.rule.name,
-    dueRaw: candidate.dueRaw,
-  })
+  const title = renderTemplate(candidate.rule.titleTemplate, tokens).trim();
+
+  const content = renderTemplate(candidate.rule.contentTemplate, tokens)
+    .replace(/\\n/g, '\n')
+    .trim();
+
+  const desc = renderTemplate(candidate.rule.descTemplate || '', tokens)
     .replace(/\\n/g, '\n')
     .trim();
 
@@ -96,6 +120,7 @@ function buildTaskPayload(app: App, candidate: SyncCandidate, projectId: string,
     projectId,
     title: title || candidate.file.basename,
     content,
+    desc: desc || undefined,
     isAllDay: due.isAllDay,
     startDate: due.startDate,
     dueDate: due.dueDate,
@@ -117,12 +142,14 @@ async function updateFrontmatterTracking(
   });
 }
 
-async function ensureRuleProjectId(
+async function ensureRuleProject(
   client: TickTickClient,
   settings: TickTickUniversitySyncSettings,
   rule: SyncRule,
-): Promise<string> {
-  if (rule.targetProjectId) return rule.targetProjectId;
+): Promise<{ id: string; name: string }> {
+  if (rule.targetProjectId) {
+    return { id: rule.targetProjectId, name: rule.targetProjectName || settings.fallbackProjectName };
+  }
 
   const projects = await client.listProjects();
   const wanted = rule.targetProjectName.trim().toLowerCase() || settings.fallbackProjectName.trim().toLowerCase();
@@ -141,13 +168,14 @@ async function ensureRuleProjectId(
 
   rule.targetProjectId = selected.id;
   rule.targetProjectName = selected.name;
-  return selected.id;
+  return { id: selected.id, name: selected.name };
 }
 
 export async function runSync(
   app: App,
   settings: TickTickUniversitySyncSettings,
   client: TickTickClient,
+  tracking: TrackingProvider,
 ): Promise<{ summary: SyncSummary; failures: string[] }> {
   const summary: SyncSummary = {
     scanned: 0,
@@ -166,35 +194,41 @@ export async function runSync(
   for (const candidate of candidates) {
     try {
       const completed = isCompletedStatus(candidate.statusRaw, candidate.rule.completedKeywords);
-      const projectId = candidate.projectId || (await ensureRuleProjectId(client, settings, candidate.rule));
+      const project = await ensureRuleProject(client, settings, candidate.rule);
 
-      if (completed && !candidate.taskId && !candidate.rule.includeCompletedWithoutTaskId) {
+      const tracked = await tracking.read(candidate);
+      const effectiveTaskId = candidate.taskId || tracked?.taskId;
+      const effectiveProjectId = candidate.projectId || tracked?.projectId || project.id;
+
+      if (completed && !effectiveTaskId && !candidate.rule.includeCompletedWithoutTaskId) {
         summary.skippedCompletedNoTask += 1;
         continue;
       }
 
-      if (!candidate.taskId && candidate.rule.syncMode === 'create_only') {
-        // allowed: create new
-      }
-
-      const payload = buildTaskPayload(app, candidate, projectId, candidate.taskId);
+      const payload = buildTaskPayload(
+        app,
+        candidate,
+        effectiveProjectId,
+        candidate.rule.targetProjectName || project.name,
+        effectiveTaskId,
+      );
 
       if (settings.dryRun) {
         summary.synced += 1;
         continue;
       }
 
-      let currentTaskId = candidate.taskId;
-      let currentProjectId = projectId;
+      let currentTaskId = effectiveTaskId;
+      let currentProjectId = effectiveProjectId;
 
       if (!currentTaskId) {
         const created = await client.createTask(payload);
         currentTaskId = created.id;
-        currentProjectId = created.projectId || projectId;
+        currentProjectId = created.projectId || effectiveProjectId;
         summary.created += 1;
       } else if (candidate.rule.syncMode === 'upsert') {
         const updated = await client.updateTask(currentTaskId, payload);
-        currentProjectId = updated.projectId || projectId;
+        currentProjectId = updated.projectId || effectiveProjectId;
         summary.updated += 1;
       }
 
@@ -204,7 +238,15 @@ export async function runSync(
       }
 
       if (currentTaskId) {
-        await updateFrontmatterTracking(app, candidate, currentTaskId, currentProjectId);
+        if (settings.trackingMode === 'frontmatter') {
+          await updateFrontmatterTracking(app, candidate, currentTaskId, currentProjectId);
+        }
+
+        await tracking.write(candidate, {
+          taskId: currentTaskId,
+          projectId: currentProjectId,
+          syncedAt: new Date().toISOString(),
+        });
       }
       summary.synced += 1;
     } catch (e) {

@@ -1,43 +1,65 @@
-# TickTick Deadline Sync (Obsidian Plugin)
+# TickTick Sync (Obsidian Plugin)
 
-Rule-based Obsidian -> TickTick sync for frontmatter deadlines.
+Modular, rule-based Obsidian -> TickTick sync for frontmatter deadlines/tasks.
 
-This is a one-way sync where Obsidian remains source of truth.
+One-way sync: Obsidian is the source of truth.
 
-## What changed in v0.2.0
+## New in v0.3.0
 
-- Modularized codebase (`src/constants.ts`, `defaults.ts`, `oauth.ts`, `ticktickClient.ts`, `sync.ts`, `ui/*`).
-- Added scenario-based sync rules (multiple profiles in one vault).
-- Added include/exclude tags per rule.
-- Added due field fallback list per rule (`due, deadline, exam_date`, etc).
-- Added sync mode per rule:
-  - `upsert` (create + update)
-  - `create_only` (only create new tasks)
-- Added configurable completion keywords per rule.
-- Added title/content templates with token support.
-- Improved setup UX with quick setup status block and safer copy/default controls.
+- Better TickTick formatting control:
+  - `titleTemplate`
+  - `contentTemplate`
+  - `descTemplate`
+- More template tokens:
+  - `{{noteTitle}}`, `{{filePath}}`, `{{class}}`, `{{obsidianLink}}`, `{{ruleName}}`, `{{dueRaw}}`
+  - `{{duePretty}}`, `{{status}}`, `{{tags}}`, `{{projectName}}`
+- Formatting presets in settings (Clean / Detailed).
+- Project dropdown selector per rule (after loading project list).
+- Optional local tracking mode:
+  - `frontmatter` (existing behavior)
+  - `local_json` (store task mapping in local plugin JSON instead of note properties)
+
+## Should tracking be local JSON or frontmatter?
+
+Short answer: both are useful, so plugin now supports both.
+
+- `frontmatter` (default):
+  - Pros: transparent in notes, portable, easy to inspect/debug.
+  - Cons: adds technical properties to note metadata.
+- `local_json`:
+  - Pros: clean note frontmatter, no TickTick IDs inside notes.
+  - Cons: mapping is local plugin state (if file missing, re-linking relies on title/create flow).
+
+Recommended:
+- Use `frontmatter` if you want reliability/transparency across devices/repo.
+- Use `local_json` if you prioritize clean note properties and accept local-state dependency.
 
 ## Core behavior
 
 - Scans markdown notes with frontmatter.
-- Rule determines whether a note should sync (tag include/exclude).
-- Reads due date from first non-empty field in each rule's `dueFields` list.
-- Creates or updates TickTick task (based on rule sync mode + task id field).
-- Writes tracking fields back into frontmatter:
-  - task id field (default `ticktick_task_id`)
-  - project id field (default `ticktick_project_id`)
-  - synced-at field (default `ticktick_synced_at`)
-- Optionally marks TickTick task complete when status matches completion keywords.
+- Rules decide inclusion (include/exclude tags).
+- Due date from first non-empty field in `dueFields` order.
+- Creates/updates TickTick tasks by rule `syncMode`.
+- Optional completion sync by status keywords.
+- Tracking:
+  - `frontmatter`: writes IDs into configured frontmatter fields.
+  - `local_json`: writes mapping to configured JSON file path.
 
-## Requirements
+## Rule settings
 
-- Obsidian 1.5+
-- TickTick OpenAPI app credentials
-  - https://developer.ticktick.com/manage
+Each rule can configure:
 
-## Installation (local build)
+- include/exclude tags
+- due field fallback list
+- field mappings (`status`, `class`, tracking fields)
+- target project (name/id + dropdown selection)
+- sync mode (`upsert` or `create_only`)
+- completion keywords and completion behavior
+- title/content/desc templates
 
-1) Build plugin
+## Setup
+
+1) Build
 
 ```bash
 npm install
@@ -45,86 +67,34 @@ npm run check
 npm run build
 ```
 
-2) Copy files into vault plugin folder:
+2) Install into vault plugin folder:
 
 `<vault>/.obsidian/plugins/ticktick-university-sync/`
 
-Required files:
+Copy:
 - `main.js`
 - `manifest.json`
 - `versions.json`
+- `styles.css` (optional)
 
-Optional:
-- `styles.css`
+3) Enable plugin in Obsidian.
 
-3) Enable in Obsidian Community Plugins.
-
-## Quick setup flow
-
-In plugin settings:
-
-1. Enter Client ID + Client Secret.
-2. Set Redirect URI (default recommended: `https://localhost/`).
-3. Click `Open OAuth URL` and authorize.
-4. Click `Exchange auth code/URL` and paste either:
-   - full redirect URL, or
-   - code value only.
-5. Click `Test API connection`.
-6. Configure at least one rule and discover/set its target project.
-7. Run `Sync now` (use `Dry run` first if you want preview-only behavior).
-
-## Rule configuration
-
-Each rule controls one scenario (university, work, personal, etc):
-
-- `enabled`
-- `tagsAny` (include if note has any tag)
-- `excludeTagsAny` (skip if note has any tag)
-- `dueFields` (ordered fallback list)
-- frontmatter keys:
-  - `statusField`
-  - `classField`
-  - `taskIdField`
-  - `projectIdField`
-  - `syncedAtField`
-- target project:
-  - `targetProjectName`
-  - `targetProjectId` (optional fixed)
-- behavior:
-  - `syncMode`: `upsert` or `create_only`
-  - `markCompletedInTickTick`
-  - `includeCompletedWithoutTaskId`
-  - `completedKeywords`
-- rendering:
-  - `titleTemplate`
-  - `contentTemplate`
-
-Supported template tokens:
-- `{{noteTitle}}`
-- `{{filePath}}`
-- `{{class}}`
-- `{{obsidianLink}}`
-- `{{ruleName}}`
-- `{{dueRaw}}`
-
-Use `\n` in template fields for line breaks.
+4) In settings:
+- set Client ID / Secret
+- set Redirect URI (default `https://localhost/`)
+- OAuth connect
+- test API connection
+- load project list (for dropdowns)
+- configure rules
+- choose tracking mode
+- run dry-run, then real sync
 
 ## Due format support
 
-- `YYYY-MM-DD` -> all-day task
+- `YYYY-MM-DD` (all-day)
 - `YYYY-MM-DDTHH:mm`
 - `YYYY-MM-DDTHH:mm:ss`
-- timezone suffix optional: `Z`, `+HH:mm`, `+HHMM`
-
-## Safety
-
-- `Dry run` skips create/update/complete and frontmatter writes.
-- Auto-sync disabled when interval is `0`.
-- Token refresh is automatic when expired.
-
-## Legacy settings migration
-
-v0.1.0 settings are migrated into one default rule automatically on load.
+- optional TZ suffix: `Z`, `+HH:mm`, `+HHMM`
 
 ## Commands
 

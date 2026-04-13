@@ -6,10 +6,11 @@ import { PluginApi } from './pluginApi';
 import { runSync } from './sync';
 import { TickTickClient } from './ticktickClient';
 import { TickTickUniversitySyncSettings } from './types';
+import { getTrackingForCandidate, setTrackingForCandidate } from './tracking';
 import { AuthCodeModal } from './ui/authCodeModal';
-import { TickTickUniversitySyncSettingTab } from './ui/settingsTab';
+import { TickTickSyncSettingTab } from './ui/settingsTab';
 
-export default class TickTickUniversitySyncPlugin extends Plugin implements PluginApi {
+export default class TickTickSyncPlugin extends Plugin implements PluginApi {
   settings: TickTickUniversitySyncSettings = DEFAULT_SETTINGS;
   private syncTimer: number | null = null;
   private client!: TickTickClient;
@@ -71,13 +72,13 @@ export default class TickTickUniversitySyncPlugin extends Plugin implements Plug
       },
     });
 
-    this.addSettingTab(new TickTickUniversitySyncSettingTab(this.app, this));
+    this.addSettingTab(new TickTickSyncSettingTab(this.app, this));
 
     this.setupAutoSync();
 
     if (this.settings.syncOnStartup) {
       this.syncNow().catch((e) => {
-        console.error('[TickTick University Sync] Startup sync failed:', e);
+        console.error('[TickTick Deadline Sync] Startup sync failed:', e);
       });
     }
   }
@@ -111,7 +112,7 @@ export default class TickTickUniversitySyncPlugin extends Plugin implements Plug
         try {
           await this.syncNow();
         } catch (e) {
-          console.error('[TickTick University Sync] Auto-sync error:', e);
+          console.error('[TickTick Deadline Sync] Auto-sync error:', e);
         }
       }, mins * 60 * 1000);
     }
@@ -235,8 +236,16 @@ export default class TickTickUniversitySyncPlugin extends Plugin implements Plug
     const start = Date.now();
 
     try {
-      const { summary, failures } = await runSync(this.app, this.settings, this.client);
-      await this.saveSettings(); // persist any discovered project IDs
+      const { summary, failures } = await runSync(this.app, this.settings, this.client, {
+        read: async (candidate) => getTrackingForCandidate(this.app, this.settings, candidate),
+        write: async (candidate, entry) => {
+          if (this.settings.trackingMode === 'local_json') {
+            await setTrackingForCandidate(this.app, this.settings, candidate, entry);
+          }
+        },
+      });
+
+      await this.saveSettings(); // persist discovered project IDs
 
       const tookMs = Date.now() - start;
       new Notice(
@@ -245,10 +254,10 @@ export default class TickTickUniversitySyncPlugin extends Plugin implements Plug
       );
 
       if (failures.length) {
-        console.error('[TickTick University Sync] Failures:', failures);
+        console.error('[TickTick Deadline Sync] Failures:', failures);
       }
     } catch (e) {
-      console.error('[TickTick University Sync] Fatal sync error:', e);
+      console.error('[TickTick Deadline Sync] Fatal sync error:', e);
       new Notice(`TickTick sync failed: ${e instanceof Error ? e.message : String(e)}`, 10000);
       throw e;
     }
