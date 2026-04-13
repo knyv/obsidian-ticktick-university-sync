@@ -1,9 +1,9 @@
 {
   "id": "ticktick-university-sync",
-  "name": "TickTick University Sync",
-  "version": "0.1.0",
+  "name": "TickTick Deadline Sync",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
-  "description": "Sync university assignment/exam frontmatter deadlines from Obsidian notes to TickTick tasks.",
+  "description": "Sync frontmatter deadlines from Obsidian notes to TickTick tasks with rule-based profiles.",
   "author": "Kenny + Hermes",
   "isDesktopOnly": false
 }

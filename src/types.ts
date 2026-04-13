@@ -1,0 +1,113 @@
+import { TFile } from 'obsidian';
+
+export type SyncMode = 'upsert' | 'create_only';
+
+export interface SyncRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+
+  // match notes where frontmatter tags includes any of these
+  tagsAny: string[];
+  // skip note if any of these tags are present
+  excludeTagsAny: string[];
+
+  // frontmatter field mapping
+  dueFields: string[];
+  statusField: string;
+  classField: string;
+  taskIdField: string;
+  projectIdField: string;
+  syncedAtField: string;
+
+  // project targeting
+  targetProjectId: string;
+  targetProjectName: string;
+
+  // behavior
+  includeCompletedWithoutTaskId: boolean;
+  markCompletedInTickTick: boolean;
+  syncMode: SyncMode;
+  completedKeywords: string[];
+
+  // rendering templates
+  // Supported tokens:
+  // {{noteTitle}} {{filePath}} {{class}} {{obsidianLink}} {{ruleName}} {{dueRaw}}
+  titleTemplate: string;
+  contentTemplate: string;
+}
+
+export interface TickTickUniversitySyncSettings {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  scopes: string;
+
+  accessToken: string;
+  refreshToken: string;
+  tokenExpiryMs: number;
+
+  fallbackProjectId: string;
+  fallbackProjectName: string;
+
+  syncOnStartup: boolean;
+  autoSyncMinutes: number;
+  dryRun: boolean;
+
+  rules: SyncRule[];
+}
+
+export type TickTickProject = {
+  id: string;
+  name: string;
+  closed?: number;
+};
+
+export type TickTickTaskPayload = {
+  id?: string;
+  projectId: string;
+  title: string;
+  content?: string;
+  desc?: string;
+  isAllDay?: boolean;
+  startDate?: string;
+  dueDate?: string;
+  timeZone?: string;
+  status?: number;
+};
+
+export type SyncCandidate = {
+  file: TFile;
+  rule: SyncRule;
+  dueRaw: string;
+  tags: string[];
+  classNames: string[];
+  statusRaw: unknown;
+  taskId?: string;
+  projectId?: string;
+};
+
+export type SyncSummary = {
+  scanned: number;
+  synced: number;
+  created: number;
+  updated: number;
+  completed: number;
+  skippedCompletedNoTask: number;
+  failed: number;
+};
+
+// minimal shape for migrating legacy settings from v0.1.0
+export type LegacySettings = Partial<TickTickUniversitySyncSettings> & {
+  ticktickProjectId?: string;
+  ticktickProjectName?: string;
+  assignmentTag?: string;
+  examTag?: string;
+  dueField?: string;
+  statusField?: string;
+  classField?: string;
+  taskIdField?: string;
+  projectIdField?: string;
+  syncedAtField?: string;
+  includeCompletedWithoutTaskId?: boolean;
+};

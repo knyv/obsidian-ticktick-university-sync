@@ -1,95 +1,135 @@
-# TickTick University Sync (Obsidian Plugin)
+# TickTick Deadline Sync (Obsidian Plugin)
 
-Syncs university assignment/exam deadlines from Obsidian note frontmatter to TickTick using TickTick OpenAPI.
+Rule-based Obsidian -> TickTick sync for frontmatter deadlines.
 
-## What it does
+This is a one-way sync where Obsidian remains source of truth.
 
-- Scans notes with tags:
-  - `university/assignments`
-  - `university/exams`
-- Reads frontmatter fields (configurable):
-  - `due` (required)
-  - `status`
-  - `class`
-- Creates or updates a TickTick task per note.
-- Stores tracking fields back to note frontmatter:
-  - `ticktick_task_id`
-  - `ticktick_project_id`
-  - `ticktick_synced_at`
-- If note status indicates completion, marks task complete in TickTick.
+## What changed in v0.2.0
+
+- Modularized codebase (`src/constants.ts`, `defaults.ts`, `oauth.ts`, `ticktickClient.ts`, `sync.ts`, `ui/*`).
+- Added scenario-based sync rules (multiple profiles in one vault).
+- Added include/exclude tags per rule.
+- Added due field fallback list per rule (`due, deadline, exam_date`, etc).
+- Added sync mode per rule:
+  - `upsert` (create + update)
+  - `create_only` (only create new tasks)
+- Added configurable completion keywords per rule.
+- Added title/content templates with token support.
+- Improved setup UX with quick setup status block and safer copy/default controls.
+
+## Core behavior
+
+- Scans markdown notes with frontmatter.
+- Rule determines whether a note should sync (tag include/exclude).
+- Reads due date from first non-empty field in each rule's `dueFields` list.
+- Creates or updates TickTick task (based on rule sync mode + task id field).
+- Writes tracking fields back into frontmatter:
+  - task id field (default `ticktick_task_id`)
+  - project id field (default `ticktick_project_id`)
+  - synced-at field (default `ticktick_synced_at`)
+- Optionally marks TickTick task complete when status matches completion keywords.
 
 ## Requirements
 
 - Obsidian 1.5+
-- TickTick OpenAPI app (Client ID + Client Secret)
+- TickTick OpenAPI app credentials
   - https://developer.ticktick.com/manage
 
-## Setup
+## Installation (local build)
 
-1. Build plugin
+1) Build plugin
 
 ```bash
 npm install
+npm run check
 npm run build
 ```
 
-2. Install plugin in vault
+2) Copy files into vault plugin folder:
 
-Copy these files into:
-`<your-vault>/.obsidian/plugins/ticktick-university-sync/`
+`<vault>/.obsidian/plugins/ticktick-university-sync/`
 
+Required files:
 - `main.js`
 - `manifest.json`
-- `styles.css` (optional)
 - `versions.json`
 
-3. Enable plugin in Obsidian Community Plugins.
+Optional:
+- `styles.css`
 
-4. Configure settings:
+3) Enable in Obsidian Community Plugins.
 
-- Client ID
-- Client Secret
-- Redirect URI (must match TickTick app settings)
-- Tag keys + field keys (defaults work with your current vault)
+## Quick setup flow
 
-5. OAuth connect flow:
+In plugin settings:
 
-- Click `Open OAuth URL`
-- Authorize in browser
-- Copy redirect URL (or code)
-- Click `Exchange auth code/URL`
+1. Enter Client ID + Client Secret.
+2. Set Redirect URI (default recommended: `https://localhost/`).
+3. Click `Open OAuth URL` and authorize.
+4. Click `Exchange auth code/URL` and paste either:
+   - full redirect URL, or
+   - code value only.
+5. Click `Test API connection`.
+6. Configure at least one rule and discover/set its target project.
+7. Run `Sync now` (use `Dry run` first if you want preview-only behavior).
 
-6. Click `Discover projects + auto-select` or manually set `TickTick target project ID`.
+## Rule configuration
 
-7. Run `Sync now`.
+Each rule controls one scenario (university, work, personal, etc):
 
-## Default field mapping
+- `enabled`
+- `tagsAny` (include if note has any tag)
+- `excludeTagsAny` (skip if note has any tag)
+- `dueFields` (ordered fallback list)
+- frontmatter keys:
+  - `statusField`
+  - `classField`
+  - `taskIdField`
+  - `projectIdField`
+  - `syncedAtField`
+- target project:
+  - `targetProjectName`
+  - `targetProjectId` (optional fixed)
+- behavior:
+  - `syncMode`: `upsert` or `create_only`
+  - `markCompletedInTickTick`
+  - `includeCompletedWithoutTaskId`
+  - `completedKeywords`
+- rendering:
+  - `titleTemplate`
+  - `contentTemplate`
 
-- Assignment tag: `university/assignments`
-- Exam tag: `university/exams`
-- Due field: `due`
-- Status field: `status`
-- Class field: `class`
+Supported template tokens:
+- `{{noteTitle}}`
+- `{{filePath}}`
+- `{{class}}`
+- `{{obsidianLink}}`
+- `{{ruleName}}`
+- `{{dueRaw}}`
 
-Tracking fields written to frontmatter:
-
-- `ticktick_task_id`
-- `ticktick_project_id`
-- `ticktick_synced_at`
+Use `\n` in template fields for line breaks.
 
 ## Due format support
 
 - `YYYY-MM-DD` -> all-day task
 - `YYYY-MM-DDTHH:mm`
 - `YYYY-MM-DDTHH:mm:ss`
-- Optional timezone suffix supported (`Z`, `+HH:mm`, `+HHMM`)
+- timezone suffix optional: `Z`, `+HH:mm`, `+HHMM`
 
 ## Safety
 
-- `Dry run` toggle scans/evaluates without writing or calling TickTick.
-- Auto-sync interval can be disabled with `0`.
+- `Dry run` skips create/update/complete and frontmatter writes.
+- Auto-sync disabled when interval is `0`.
+- Token refresh is automatic when expired.
 
-## Notes
+## Legacy settings migration
 
-- This plugin is one-way sync (Obsidian -> TickTick) by design.
-- Obsidian is the source of truth.
+v0.1.0 settings are migrated into one default rule automatically on load.
+
+## Commands
+
+- Sync deadlines to TickTick now
+- Open TickTick OAuth authorization URL
+- Exchange TickTick auth code/URL
+- Test TickTick API connection
+- Discover TickTick projects and auto-select target

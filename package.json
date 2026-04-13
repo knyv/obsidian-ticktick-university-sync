@@ -1,7 +1,7 @@
 {
   "name": "obsidian-ticktick-university-sync",
-  "version": "0.1.0",
-  "description": "Obsidian plugin to sync university assignment/exam frontmatter deadlines to TickTick OpenAPI",
+  "version": "0.2.0",
+  "description": "Obsidian plugin to sync frontmatter deadlines from notes to TickTick with rule-based profiles",
   "main": "main.js",
   "scripts": {
     "build": "node esbuild.config.mjs --production",
