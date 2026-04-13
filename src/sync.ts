@@ -392,8 +392,12 @@ export async function runSync(
       phase = 'read-tracking';
       const tracked = await tracking.read(candidate);
       const existingRef = pickExistingTaskRef(candidate, tracked, settings.trackingMode);
-      const effectiveTaskId = existingRef?.taskId;
-      const effectiveProjectId = existingRef?.projectId || project.id;
+
+      // Guard against stale cross-rule/cross-project tracking links.
+      // If tracked project does not match this rule's selected target project, ignore tracked task.
+      const trackedProjectMismatch = Boolean(existingRef?.projectId && existingRef.projectId !== project.id);
+      const effectiveTaskId = trackedProjectMismatch ? undefined : existingRef?.taskId;
+      const effectiveProjectId = trackedProjectMismatch ? project.id : (existingRef?.projectId || project.id);
 
       const selectionMode = candidate.rule.candidateSelectionMode || 'all';
       if (selectionMode === 'new_only' && effectiveTaskId) {

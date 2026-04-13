@@ -72,7 +72,16 @@ export async function getTrackingForCandidate(
   const map = await readTrackingMap(app, settings);
   const scoped = map[ruleScopedKey(candidate)];
   if (scoped) return scoped;
-  return map[candidate.file.path];
+
+  const legacy = map[candidate.file.path];
+  if (!legacy) return undefined;
+
+  // Safety: only trust legacy file-level key if it points to this rule's target project.
+  if (candidate.rule.targetProjectId && legacy.projectId && legacy.projectId !== candidate.rule.targetProjectId) {
+    return undefined;
+  }
+
+  return legacy;
 }
 
 export async function setTrackingForCandidate(
