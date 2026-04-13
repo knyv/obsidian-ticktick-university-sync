@@ -183,10 +183,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Due fields (fallback order)')
-      .setDesc('Comma-separated keys. First non-empty key wins (example: due, deadline).')
+      .setName('Due properties (fallback order)')
+      .setDesc('Comma-separated frontmatter property names. First non-empty property wins (example: due, deadline, exam_date).')
       .addText((text) =>
-        text.setValue(listToCsv(rule.dueFields)).onChange(async (value) => {
+        text.setPlaceholder('due, deadline').setValue(listToCsv(rule.dueFields)).onChange(async (value) => {
           rule.dueFields = csvToList(value);
           await this.plugin.saveSettings();
         }),
@@ -463,19 +463,28 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    new Setting(containerEl)
-      .setName('OAuth actions')
-      .setDesc('Run these in order: Developer Apps -> OAuth -> Exchange')
+    const oauthWrap = containerEl.createEl('div', { cls: 'ticktick-flow-actions-grid' });
+
+    const oauthStep1 = new Setting(oauthWrap).setName('Step 1').setDesc('Open TickTick developer app settings');
+    oauthStep1
       .addButton((btn) =>
-        btn.setButtonText('Open TickTick Developer Apps').onClick(() => {
+        btn.setButtonText('Open TickTick Developer Apps').setClass('mod-cta').onClick(() => {
           this.plugin.openTickTickDeveloperPage();
         }),
       )
+      .settingEl.addClass('ticktick-flow-action-row');
+
+    const oauthStep2 = new Setting(oauthWrap).setName('Step 2').setDesc('Open OAuth consent page in browser');
+    oauthStep2
       .addButton((btn) =>
         btn.setButtonText('Open OAuth URL').onClick(() => {
           this.plugin.openOAuthUrl();
         }),
       )
+      .settingEl.addClass('ticktick-flow-action-row');
+
+    const oauthStep3 = new Setting(oauthWrap).setName('Step 3').setDesc('Exchange redirect URL/code from clipboard');
+    oauthStep3
       .addButton((btn) =>
         btn.setButtonText('Exchange from Clipboard').onClick(async () => {
           try {
@@ -486,6 +495,10 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
           }
         }),
       )
+      .settingEl.addClass('ticktick-flow-action-row');
+
+    const oauthStep4 = new Setting(oauthWrap).setName('Alternative').setDesc('If clipboard fails, paste manually');
+    oauthStep4
       .addButton((btn) =>
         btn.setButtonText('Manual Exchange').onClick(() => {
           new AuthCodeModal(this.app, async (input) => {
@@ -493,7 +506,8 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
             this.display();
           }).open();
         }),
-      );
+      )
+      .settingEl.addClass('ticktick-flow-action-row');
 
     new Setting(containerEl)
       .setName('Connection checks')

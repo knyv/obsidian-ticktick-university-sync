@@ -49,3 +49,24 @@
 .ticktick-flow-rule h5 {
   margin-top: 6px;
 }
+
+.ticktick-flow-actions-grid {
+  margin: 8px 0 12px 0;
+}
+
+.ticktick-flow-action-row {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--background-secondary);
+}
+
+.ticktick-flow-action-row .setting-item-control {
+  min-width: 240px;
+  justify-content: flex-end;
+}
+
+.ticktick-flow-action-row button {
+  width: 100%;
+}
