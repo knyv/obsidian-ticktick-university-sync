@@ -530,13 +530,13 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl('h5', { text: 'D) TickTick task content' });
-    const showFormatting = this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode;
+    const showFormatting = !this.formattingEditorOpenByRuleId.has(rule.id);
 
     new Setting(containerEl)
-      .setName('Formatting section')
-      .setDesc(showFormatting ? 'Formatting controls are visible below.' : 'Hidden for focus. Open when you want to customize task text/layout.')
+      .setName('Content + TickTick tags section')
+      .setDesc(showFormatting ? 'Visible by default so task content + TickTick tags are always easy to edit.' : 'Hidden. Show to edit TickTick task content and tags.')
       .addButton((btn) =>
-        btn.setButtonText(showFormatting ? 'Hide formatting' : 'Customize formatting').onClick(() => {
+        btn.setButtonText(showFormatting ? 'Hide content + tags' : 'Show content + tags').onClick(() => {
           if (this.formattingEditorOpenByRuleId.has(rule.id)) this.formattingEditorOpenByRuleId.delete(rule.id);
           else this.formattingEditorOpenByRuleId.add(rule.id);
           this.display();
@@ -771,13 +771,6 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         btn.setButtonText(this.matchingDetailsOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode ? 'Hide matching' : 'Matching').onClick(() => {
           if (this.matchingDetailsOpenByRuleId.has(rule.id)) this.matchingDetailsOpenByRuleId.delete(rule.id);
           else this.matchingDetailsOpenByRuleId.add(rule.id);
-          this.display();
-        }),
-      )
-      .addButton((btn) =>
-        btn.setButtonText(this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode ? 'Hide content' : 'Content').onClick(() => {
-          if (this.formattingEditorOpenByRuleId.has(rule.id)) this.formattingEditorOpenByRuleId.delete(rule.id);
-          else this.formattingEditorOpenByRuleId.add(rule.id);
           this.display();
         }),
       )
