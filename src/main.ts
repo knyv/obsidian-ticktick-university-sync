@@ -122,6 +122,14 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
       },
     });
 
+    this.addCommand({
+      id: 'ticktick-flow-clean-stale-tracking',
+      name: 'Tracking: remove stale task IDs (missing in TickTick)',
+      callback: async () => {
+        await this.cleanStaleTracking();
+      },
+    });
+
     this.addSettingTab(new TickTickSyncSettingTab(this.app, this));
 
     this.setupAutoSync();
@@ -360,6 +368,46 @@ export default class TickTickSyncPlugin extends Plugin implements PluginApi {
     const projects = await this.client.listProjects();
     this.cachedProjects = projects;
     new Notice(`TickTick connected. Projects: ${projects.length}`);
+  }
+
+  async cleanStaleTracking() {
+    const path = this.settings.localTrackingFile || '.obsidian/plugins/ticktick-flow-sync/tracking.json';
+    const exists = await this.app.vault.adapter.exists(path);
+    if (!exists) {
+      new Notice('No tracking file found.');
+      return;
+    }
+
+    const raw = await this.app.vault.adapter.read(path).catch(() => '');
+    if (!raw.trim()) {
+      new Notice('Tracking file is empty.');
+      return;
+    }
+
+    let map: Record<string, { taskId?: string; projectId?: string; syncedAt?: string }> = {};
+    try {
+      map = JSON.parse(raw);
+    } catch {
+      new Notice('Tracking file is not valid JSON.');
+      return;
+    }
+
+    let removed = 0;
+    for (const [key, entry] of Object.entries(map)) {
+      const pid = String(entry?.projectId || '');
+      const tid = String(entry?.taskId || '');
+      if (!pid || !tid) continue;
+
+      try {
+        await this.client.getTask(pid, tid);
+      } catch {
+        delete map[key];
+        removed += 1;
+      }
+    }
+
+    await this.app.vault.adapter.write(path, JSON.stringify(map, null, 2));
+    new Notice(`Tracking cleanup done. Removed ${removed} stale entries.`);
   }
 
   async linkCurrentNoteToExistingTask() {

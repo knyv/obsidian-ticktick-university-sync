@@ -93,7 +93,15 @@ export async function setTrackingForCandidate(
 ): Promise<void> {
   if (settings.trackingMode !== 'local_json' && !opts?.forceLocal) return;
   const map = await readTrackingMap(app, settings);
-  map[candidate.file.path] = entry;
+
+  // Always keep rule-scoped key authoritative.
   map[ruleScopedKey(candidate)] = entry;
+
+  // Keep legacy file key only when it is empty or already same project.
+  const legacy = map[candidate.file.path];
+  if (!legacy || !legacy.projectId || legacy.projectId === entry.projectId) {
+    map[candidate.file.path] = entry;
+  }
+
   await writeTrackingMap(app, settings, map);
 }

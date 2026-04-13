@@ -228,3 +228,4 @@ Command palette now focuses on operational commands (OAuth beginner actions are 
 - Projects: validate and refresh selected target projects
 - Tags: fetch known TickTick tags (preview)
 - Tracking: link note to existing TickTick task
+- Tracking: remove stale task IDs (missing in TickTick)
