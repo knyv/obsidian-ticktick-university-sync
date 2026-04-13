@@ -153,6 +153,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
   private presetEditorOpenByRuleId = new Set<string>();
   private advancedEditorOpenByRuleId = new Set<string>();
   private formattingEditorOpenByRuleId = new Set<string>();
+  private matchingDetailsOpenByRuleId = new Set<string>();
 
   constructor(app: App, plugin: PluginApi) {
     super(app, plugin as never);
@@ -347,7 +348,7 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
       });
     }
 
-    containerEl.createEl('h5', { text: 'A) Match notes' });
+    containerEl.createEl('h5', { text: 'A) Basic setup' });
 
     new Setting(containerEl)
       .setName('Rule name')
@@ -367,28 +368,43 @@ export class TickTickSyncSettingTab extends PluginSettingTab {
         text.setPlaceholder('university/assignments, university/exams').setValue(listToCsv(rule.tagsAny)).onChange(async (value) => {
           rule.tagsAny = csvToList(value);
           await this.plugin.saveSettings();
+          this.display();
         }),
       );
 
+    const showMatchDetails = this.matchingDetailsOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode;
     new Setting(containerEl)
-      .setName('Exclude tags')
-      .setDesc('Comma-separated. Notes with these tags are skipped.')
-      .addText((text) =>
-        text.setPlaceholder('archive, someday').setValue(listToCsv(rule.excludeTagsAny)).onChange(async (value) => {
-          rule.excludeTagsAny = csvToList(value);
-          await this.plugin.saveSettings();
+      .setName('Matching details')
+      .setDesc(showMatchDetails ? 'Include/exclude and due matching options are visible below.' : 'Hidden for focus. Open to tune exclude tags and due property fallback.')
+      .addButton((btn) =>
+        btn.setButtonText(showMatchDetails ? 'Hide matching details' : 'Matching details').onClick(() => {
+          if (this.matchingDetailsOpenByRuleId.has(rule.id)) this.matchingDetailsOpenByRuleId.delete(rule.id);
+          else this.matchingDetailsOpenByRuleId.add(rule.id);
+          this.display();
         }),
       );
 
-    new Setting(containerEl)
-      .setName('Due properties (fallback order)')
-      .setDesc('Comma-separated frontmatter property names. First non-empty property wins (example: due, deadline, exam_date).')
-      .addText((text) =>
-        text.setPlaceholder('due, deadline').setValue(listToCsv(rule.dueFields)).onChange(async (value) => {
-          rule.dueFields = csvToList(value);
-          await this.plugin.saveSettings();
-        }),
-      );
+    if (showMatchDetails) {
+      new Setting(containerEl)
+        .setName('Exclude tags')
+        .setDesc('Comma-separated. Notes with these tags are skipped.')
+        .addText((text) =>
+          text.setPlaceholder('archive, someday').setValue(listToCsv(rule.excludeTagsAny)).onChange(async (value) => {
+            rule.excludeTagsAny = csvToList(value);
+            await this.plugin.saveSettings();
+          }),
+        );
+
+      new Setting(containerEl)
+        .setName('Due properties (fallback order)')
+        .setDesc('Comma-separated frontmatter property names. First non-empty property wins (example: due, deadline, exam_date).')
+        .addText((text) =>
+          text.setPlaceholder('due, deadline').setValue(listToCsv(rule.dueFields)).onChange(async (value) => {
+            rule.dueFields = csvToList(value);
+            await this.plugin.saveSettings();
+          }),
+        );
+    }
 
     containerEl.createEl('h5', { text: 'B) Project target' });
 
@@ -671,6 +687,13 @@ Path: {{filePath}}`;
         }),
       )
       .addButton((btn) =>
+        btn.setButtonText(this.matchingDetailsOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode ? 'Hide matching' : 'Matching').onClick(() => {
+          if (this.matchingDetailsOpenByRuleId.has(rule.id)) this.matchingDetailsOpenByRuleId.delete(rule.id);
+          else this.matchingDetailsOpenByRuleId.add(rule.id);
+          this.display();
+        }),
+      )
+      .addButton((btn) =>
         btn.setButtonText(this.formattingEditorOpenByRuleId.has(rule.id) || !this.plugin.settings.simpleMode ? 'Hide formatting' : 'Formatting').onClick(() => {
           if (this.formattingEditorOpenByRuleId.has(rule.id)) this.formattingEditorOpenByRuleId.delete(rule.id);
           else this.formattingEditorOpenByRuleId.add(rule.id);
@@ -704,6 +727,7 @@ Path: {{filePath}}`;
           this.presetEditorOpenByRuleId.delete(rule.id);
           this.advancedEditorOpenByRuleId.delete(rule.id);
           this.formattingEditorOpenByRuleId.delete(rule.id);
+          this.matchingDetailsOpenByRuleId.delete(rule.id);
           await this.plugin.saveSettings();
           this.display();
         }),
@@ -901,6 +925,7 @@ Path: {{filePath}}`;
           await this.addBlankRule();
           this.advancedEditorOpenByRuleId.clear();
           this.formattingEditorOpenByRuleId.clear();
+          this.matchingDetailsOpenByRuleId.clear();
         }),
       );
     addBlank.settingEl.addClass('ticktick-flow-add-rule-row');

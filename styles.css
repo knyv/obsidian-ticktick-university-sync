@@ -207,6 +207,15 @@
   background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
 }
 
+.ticktick-flow-rule h5 {
+  margin-top: 10px;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .ticktick-flow-rule-quickstart p {
   margin: 0;
   font-size: 12px;

@@ -158,7 +158,8 @@ Settings panes:
 - Rules: add/edit rules, apply custom presets, save exact rule as preset
   - each rule now has inline quick summary + readiness chip (`Ready to sync` / `Needs setup`)
   - each rule includes a `Fix this rule` quick action when project is missing
-  - formatting controls are now hidden by default in simple mode (`Formatting` button)
+  - matching details are collapsed by default in simple mode (`Matching` button)
+  - formatting controls are collapsed by default in simple mode (`Formatting` button)
   - advanced per-rule options are hidden behind `Advanced` button in `Rule actions`
 - Advanced: sync automation, tracking mode, token mode, performance, reset
 
